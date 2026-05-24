@@ -44,6 +44,10 @@
 
 #include "TracySystem.hpp"
 
+#ifdef TRACY_PLATFORM_HEADER
+#  include TRACY_PLATFORM_HEADER
+#endif
+
 #if defined _WIN32
 extern "C" typedef HRESULT (WINAPI *t_SetThreadDescription)( HANDLE, PCWSTR );
 extern "C" typedef HRESULT (WINAPI *t_GetThreadDescription)( HANDLE, PWSTR* );
@@ -62,7 +66,9 @@ namespace detail
 
 TRACY_API uint32_t GetThreadHandleImpl()
 {
-#if defined _WIN32
+#if defined TRACY_HAS_CUSTOM_THREAD_ID
+    return PlatformGetThreadId();
+#elif defined _WIN32
     static_assert( sizeof( decltype( GetCurrentThreadId() ) ) <= sizeof( uint32_t ), "Thread handle too big to fit in protocol" );
     return uint32_t( GetCurrentThreadId() );
 #elif defined __APPLE__
@@ -333,6 +339,55 @@ TRACY_API const char* GetEnvVar( const char* name )
     return buffer;
 #else
     return getenv(name);
+#endif
+}
+
+TRACY_API const char* GetUserLogin()
+{
+#if defined TRACY_HAS_CUSTOM_USER_INFO
+    return PlatformGetUserLogin();
+#elif defined _WIN32
+#  if defined TRACY_WIN32_NO_DESKTOP
+    return "(?)";
+#  else
+    DWORD userSz = UNLEN+1;
+    static char user[UNLEN+1];
+    GetUserNameA( user, &userSz );
+    return user;
+#  endif
+#elif defined __ANDROID__
+    const auto user = getlogin();
+    if( user ) return user;
+    return "(?)";
+#else
+    static char user[1024] = {};
+    getlogin_r( user, sizeof( user ) );
+    return user;
+#endif
+}
+
+TRACY_API const char* GetUserFullName()
+{
+#if defined TRACY_HAS_CUSTOM_USER_INFO
+    return PlatformGetUserFullName();
+#elif defined _WIN32
+    static char buf[1024];
+    ULONG size = sizeof( buf );
+    if( GetUserNameExA( NameDisplay, buf, &size ) ) return buf;
+    return nullptr;
+#elif defined __ANDROID__
+    const auto passwd = getpwuid( getuid() );
+    if( passwd && passwd->pw_gecos && *passwd->pw_gecos ) return passwd->pw_gecos;
+    return nullptr;
+#else
+    static char buf[4*1024];
+    struct passwd pwd;
+    struct passwd* ptr;
+    if( getpwuid_r( getuid(), &pwd, buf, sizeof( buf ), &ptr ) == 0 && ptr == &pwd && *pwd.pw_gecos )
+    {
+        return pwd.pw_gecos;
+    }
+    return nullptr;
 #endif
 }
 
