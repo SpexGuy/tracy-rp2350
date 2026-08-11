@@ -510,7 +510,7 @@ bool ListenSocket::Listen( uint16_t port, int backlog )
     return true;
 }
 
-Socket* ListenSocket::Accept()
+void ListenSocket::Accept(std::optional<Socket>& out_socket)
 {
     struct sockaddr_storage remote;
     socklen_t sz = sizeof( remote );
@@ -522,20 +522,14 @@ Socket* ListenSocket::Accept()
     if( poll( &fd, 1, 10 ) > 0 )
     {
         int sock = accept( m_sock, (sockaddr*)&remote, &sz);
-        if( sock == -1 ) return nullptr;
+        if( sock == -1 ) return;
 
 #if defined __APPLE__
         int val = 1;
         setsockopt( sock, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof( val ) );
 #endif
 
-        auto ptr = (Socket*)tracy_malloc( sizeof( Socket ) );
-        new(ptr) Socket( sock );
-        return ptr;
-    }
-    else
-    {
-        return nullptr;
+        out_socket.emplace( sock );
     }
 }
 

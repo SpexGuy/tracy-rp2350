@@ -2,6 +2,7 @@
 #define __TRACYSOCKET_HPP__
 
 #include <atomic>
+#include <optional>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -76,7 +77,7 @@ public:
     ~ListenSocket();
 
     bool Listen( uint16_t port, int backlog );
-    Socket* Accept();
+    void Accept(std::optional<Socket>& out_socket);
     void Close();
 
     ListenSocket( const ListenSocket& ) = delete;

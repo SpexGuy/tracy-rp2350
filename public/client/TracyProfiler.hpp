@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <atomic>
+#include <optional>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -1013,8 +1014,8 @@ private:
     std::atomic<bool> m_shutdown;
     std::atomic<bool> m_shutdownManual;
     std::atomic<bool> m_shutdownFinished;
-    Socket* m_sock;
-    UdpBroadcast* m_broadcast;
+    std::optional<Socket> m_sock;
+    std::optional<UdpBroadcast> m_broadcast;
     bool m_noExit;
     uint32_t m_userPort;
     std::atomic<uint32_t> m_zoneId;

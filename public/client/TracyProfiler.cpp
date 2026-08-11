@@ -1455,8 +1455,8 @@ Profiler::Profiler()
     , m_shutdown( false )
     , m_shutdownManual( false )
     , m_shutdownFinished( false )
-    , m_sock( nullptr )
-    , m_broadcast( nullptr )
+    , m_sock( std::nullopt )
+    , m_broadcast( std::nullopt )
     , m_noExit( false )
     , m_userPort( 0 )
     , m_zoneId( 1 )
@@ -1678,17 +1678,8 @@ Profiler::~Profiler()
     tracy_free( m_buffer );
     LZ4_freeStream( (LZ4_stream_t*)m_stream );
 
-    if( m_sock )
-    {
-        m_sock->~Socket();
-        tracy_free( m_sock );
-    }
-
-    if( m_broadcast )
-    {
-        m_broadcast->~UdpBroadcast();
-        tracy_free( m_broadcast );
-    }
+    m_sock = std::nullopt;
+    m_broadcast = std::nullopt;
 
     assert( s_instance );
     s_instance = nullptr;
@@ -1846,8 +1837,7 @@ void Profiler::Worker()
     }
 
 #ifndef TRACY_NO_BROADCAST
-    m_broadcast = (UdpBroadcast*)tracy_malloc( sizeof( UdpBroadcast ) );
-    new(m_broadcast) UdpBroadcast();
+    m_broadcast.emplace();
 #  ifdef TRACY_ONLY_LOCALHOST
     const char* addr = "127.255.255.255";
 #  elif defined TRACY_CLIENT_ADDRESS
@@ -1861,9 +1851,7 @@ void Profiler::Worker()
 #  endif
     if( !m_broadcast->Open( addr, broadcastPort ) )
     {
-        m_broadcast->~UdpBroadcast();
-        tracy_free( m_broadcast );
-        m_broadcast = nullptr;
+        m_broadcast = std::nullopt;
     }
 #endif
 
@@ -1891,7 +1879,7 @@ void Profiler::Worker()
                 return;
             }
 #endif
-            m_sock = listen.Accept();
+            listen.Accept(m_sock);
             if( m_sock ) break;
 #ifndef TRACY_ON_DEMAND
             ProcessSysTime();
@@ -1935,9 +1923,7 @@ void Profiler::Worker()
             auto res = m_sock->ReadRaw( shibboleth, HandshakeShibbolethSize, 2000 );
             if( !res || memcmp( shibboleth, HandshakeShibboleth, HandshakeShibbolethSize ) != 0 )
             {
-                m_sock->~Socket();
-                tracy_free( m_sock );
-                m_sock = nullptr;
+                m_sock = std::nullopt;
                 continue;
             }
 
@@ -1945,9 +1931,7 @@ void Profiler::Worker()
             res = m_sock->ReadRaw( &protocolVersion, sizeof( protocolVersion ), 2000 );
             if( !res )
             {
-                m_sock->~Socket();
-                tracy_free( m_sock );
-                m_sock = nullptr;
+                m_sock = std::nullopt;
                 continue;
             }
 
@@ -1955,9 +1939,7 @@ void Profiler::Worker()
             {
                 HandshakeStatus status = HandshakeProtocolMismatch;
                 m_sock->Send( &status, sizeof( status ) );
-                m_sock->~Socket();
-                tracy_free( m_sock );
-                m_sock = nullptr;
+                m_sock = std::nullopt;
                 continue;
             }
         }
@@ -2079,9 +2061,7 @@ void Profiler::Worker()
         m_bufferStart = 0;
 #endif
 
-        m_sock->~Socket();
-        tracy_free( m_sock );
-        m_sock = nullptr;
+        m_sock = std::nullopt;
 
 #ifndef TRACY_ON_DEMAND
         // Client is no longer available here. Accept incoming connections, but reject handshake.
@@ -2095,16 +2075,14 @@ void Profiler::Worker()
 
             ClearQueues( token );
 
-            m_sock = listen.Accept();
+            listen.Accept(m_sock);
             if( m_sock )
             {
                 char shibboleth[HandshakeShibbolethSize];
                 auto res = m_sock->ReadRaw( shibboleth, HandshakeShibbolethSize, 1000 );
                 if( !res || memcmp( shibboleth, HandshakeShibboleth, HandshakeShibbolethSize ) != 0 )
                 {
-                    m_sock->~Socket();
-                    tracy_free( m_sock );
-                    m_sock = nullptr;
+                    m_sock = std::nullopt;
                     continue;
                 }
 
@@ -2112,16 +2090,13 @@ void Profiler::Worker()
                 res = m_sock->ReadRaw( &protocolVersion, sizeof( protocolVersion ), 1000 );
                 if( !res )
                 {
-                    m_sock->~Socket();
-                    tracy_free( m_sock );
-                    m_sock = nullptr;
+                    m_sock = std::nullopt;
                     continue;
                 }
 
                 HandshakeStatus status = HandshakeNotAvailable;
                 m_sock->Send( &status, sizeof( status ) );
-                m_sock->~Socket();
-                tracy_free( m_sock );
+                m_sock = std::nullopt;
             }
         }
 #endif
