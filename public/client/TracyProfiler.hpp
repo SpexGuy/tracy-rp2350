@@ -121,26 +121,33 @@ struct LuaZoneState
 #endif
 
 
-#define TracyLfqPrepare( _type ) \
+#define TracyLfqBegin \
     tracy::moodycamel::ConcurrentQueueDefaultTraits::index_t __magic; \
     auto __token = tracy::GetToken(); \
     auto& __tail = __token->get_tail_index(); \
-    auto item = __token->enqueue_begin( __magic ); \
+    tracy::QueueItem* item = nullptr;
+
+#define TracyLfqItem( _type ) \
+    if (item) { __tail.store( __magic + 1, std::memory_order_release ); } \
+    item = __token->enqueue_begin( __magic ); \
     tracy::MemWrite( &item->hdr.type, _type );
 
 #define TracyLfqCommit \
     __tail.store( __magic + 1, std::memory_order_release );
 
 
-#define TracyLfqPrepareC( _type ) TracyLfqPrepare( _type )
+#define TracyLfqBeginC TracyLfqBegin
+#define TracyLfqItemC( _type ) TracyLfqItem( _type )
 #define TracyLfqCommitC TracyLfqCommit
 
 
-#define TracySerialPrepare( _type ) \
-    auto item = tracy::Profiler::QueueSerial(); \
+#define TracySerialBegin \
+    tracy::QueueItem* item = nullptr;
+#define TracySerialItem( _type ) \
+    item = tracy::Profiler::QueueSerial( item ); \
     tracy::MemWrite( &item->hdr.type, _type );
-#define TracySerialPrepareCallstack( _type, _callstack ) \
-    auto item = tracy::Profiler::QueueSerialCallstack( _callstack ); \
+#define TracySerialItemCallstack( _type, _callstack ) \
+    item = tracy::Profiler::QueueSerialCallstack( _callstack, item ); \
     tracy::MemWrite( &item->hdr.type, _type );
 #define TracySerialCommit \
     tracy::Profiler::QueueSerialFinish();
@@ -167,24 +174,38 @@ struct LuaZoneState
 
 #ifdef TRACY_FIBERS
 
-#  define TracyQueuePrepare( _type ) TracySerialPrepare( _type )
+#  define TracyQueueBegin \
+    TracySerialBegin;
+#  define TracyQueueItem( _type ) TracySerialItem( _type )
 #  define TracyQueueCommit( _name ) \
     tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
     TracySerialCommit;
 
-#  define TracyQueuePrepareC( _type ) TracySerialPrepare( _type )
+#  define TracyQueueBeginC \
+    TracySerialBegin;
+#  define TracyQueueItemC( _type ) TracySerialItem( _type )
 #  define TracyQueueCommitC( _name ) \
     tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
     TracySerialCommit;
 
 #else
 
-#  define TracyQueuePrepare( _type ) TracyLfqPrepare( _type )
+#  define TracyQueueBegin TracyLfqBegin
+#  define TracyQueueItem( _type ) TracyLfqItem( _type )
 #  define TracyQueueCommit( _name ) TracyLfqCommit
-#  define TracyQueuePrepareC( _type ) TracyLfqPrepareC( _type )
+#  define TracyQueueBeginC TracyLfqBeginC
+#  define TracyQueueItemC( _type ) TracyLfqItemC( _type )
 #  define TracyQueueCommitC( _name ) TracyLfqCommitC
 
 #endif
+
+
+#define TracyQueuePrepare( _type ) TracyQueueBegin; TracyQueueItem( _type )
+#define TracyQueuePrepareC( _type ) TracyQueueBeginC; TracyQueueItemC( _type )
+#define TracyLfqPrepare( _type ) TracyLfqBegin; TracyLfqItem( _type )
+#define TracyLfqPrepareC( _type ) TracyLfqBeginC; TracyLfqItemC( _type )
+#define TracySerialPrepare( _type ) TracySerialBegin; TracySerialItem( _type )
+#define TracySerialPrepareCallstack( _type, _callstack ) TracySerialBegin; TracySerialItemCallstack( _type, _callstack )
 
 
 typedef void(*ParameterCallback)( void* data, uint32_t idx, int32_t val );
@@ -292,17 +313,27 @@ public:
         return m_zoneId.fetch_add( 1, std::memory_order_relaxed );
     }
 
-    static tracy_force_inline QueueItem* QueueSerial()
+    static tracy_force_inline QueueItem* QueueSerial( QueueItem* prev_item = nullptr )
     {
         auto& p = GetProfiler();
-        p.m_serialLock.lock();
+        if (prev_item) {
+            // already locked
+            p.m_serialQueue.commit_next();
+        } else {
+            p.m_serialLock.lock();
+        }
         return p.m_serialQueue.prepare_next();
     }
 
-    static tracy_force_inline QueueItem* QueueSerialCallstack( void* ptr )
+    static tracy_force_inline QueueItem* QueueSerialCallstack( void* ptr, QueueItem* prev_item = nullptr )
     {
         auto& p = GetProfiler();
-        p.m_serialLock.lock();
+        if (prev_item) {
+            // already locked
+            p.m_serialQueue.commit_next();
+        } else {
+            p.m_serialLock.lock();
+        }
         p.SendCallstackSerial( ptr );
         return p.m_serialQueue.prepare_next();
     }
