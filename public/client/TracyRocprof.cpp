@@ -107,18 +107,16 @@ uint8_t gpu_context_allocate( ToolData* data )
         TracySerialCommit; // TODO should this defer?
     }
 
-    // Send the name of the context along.
-    // NOTE: Tracy will unconditionally free the name so we must clone it here.
-    // Since internally Tracy will use its own rpmalloc implementation we must
-    // make sure we allocate from the same source.
-    size_t name_length = strlen( CTX_NAME );
-    char* cloned_name = (char*)tracy::tracy_malloc( name_length );
-    memcpy( cloned_name, CTX_NAME, name_length );
     {
-        TracySerialPrepare( tracy::QueueType::GpuContextName );
+        size_t name_length = strlen( CTX_NAME );
+        char* name_ptr = CTX_NAME;
+
+        TracySerialBegin;
+        TracySerialSingleString( name_ptr, name_length );
+        TracySerialItem( tracy::QueueType::GpuContextName );
         tracy::MemWrite( &item->gpuContextNameFat.context, context_id );
-        tracy::MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)cloned_name );
-        tracy::MemWrite( &item->gpuContextNameFat.size, name_length );
+        TracySerialFat( &item->gpuContextNameFat.ptr, (uint64_t)name_ptr );
+        TracySerialFat( &item->gpuContextNameFat.size, name_length );
         TracySerialDeferCommit;
     }
 
@@ -341,15 +339,17 @@ void dispatch_callback( rocprofiler_dispatch_counting_service_data_t dispatch_da
         {
             collect_counters.push_back( counter );
 
-            size_t name_length = strlen( info.name );
-            char* cloned_name = (char*)tracy::tracy_malloc( name_length );
-            memcpy( cloned_name, info.name, name_length );
             {
-                TracySerialPrepare( tracy::QueueType::GpuAnnotationName );
+                size_t name_length = strlen( info.name );
+                char* name_ptr = info.name;
+
+                TracySerialBegin;
+                TracySerialSingleString( name_ptr, name_length );
+                TracySerialItem( tracy::QueueType::GpuAnnotationName );
                 tracy::MemWrite( &item->gpuAnnotationNameFat.context, data->context_id );
                 tracy::MemWrite( &item->gpuAnnotationNameFat.noteId, counter.handle );
-                tracy::MemWrite( &item->gpuAnnotationNameFat.ptr, (uint64_t)cloned_name );
-                tracy::MemWrite( &item->gpuAnnotationNameFat.size, name_length );
+                TracySerialFat( &item->gpuAnnotationNameFat.ptr, (uint64_t)name_ptr );
+                TracySerialFat( &item->gpuAnnotationNameFat.size, name_length );
                 TracySerialCommit;
             }
         }

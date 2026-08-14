@@ -352,12 +352,11 @@ static inline int LuaZoneText( lua_State* L )
     const auto size = strlen( txt );
     assert( size < (std::numeric_limits<uint16_t>::max)() );
 
-    auto ptr = (char*)tracy_malloc( size );
-    memcpy( ptr, txt, size );
-
-    TracyQueuePrepare( QueueType::ZoneText );
-    MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-    MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+    TracyQueueBegin;
+    TracyQueueSingleString( txt, size );
+    TracyQueueItem( QueueType::ZoneText );
+    TracyQueueFat( &item->zoneTextFat.text, (uint64_t)txt );
+    TracyQueueFat( &item->zoneTextFat.size, (uint16_t)size );
     TracyQueueCommit( zoneTextFatThread );
     return 0;
 }
@@ -377,12 +376,11 @@ static inline int LuaZoneName( lua_State* L )
     const auto size = strlen( txt );
     assert( size < (std::numeric_limits<uint16_t>::max)() );
 
-    auto ptr = (char*)tracy_malloc( size );
-    memcpy( ptr, txt, size );
-
-    TracyQueuePrepare( QueueType::ZoneName );
-    MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-    MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+    TracyQueueBegin;
+    TracyQueueSingleString( txt, size );
+    TracyQueueItem( QueueType::ZoneName );
+    TracyQueueFat( &item->zoneTextFat.text, (uint64_t)txt );
+    TracyQueueFat( &item->zoneTextFat.size, (uint16_t)size );
     TracyQueueCommit( zoneTextFatThread );
     return 0;
 }
@@ -397,13 +395,12 @@ static inline int LuaMessage( lua_State* L )
     const auto size = strlen( txt );
     assert( size < (std::numeric_limits<uint16_t>::max)() );
 
-    auto ptr = (char*)tracy_malloc( size );
-    memcpy( ptr, txt, size );
-
-    TracyQueuePrepare( QueueType::Message );
+    TracyQueueBegin;
+    TracyQueueSingleString( txt, size );
+    TracyQueueItem( QueueType::Message );
     MemWrite( &item->messageFat.time, Profiler::GetTime() );
-    MemWrite( &item->messageFat.text, (uint64_t)ptr );
-    MemWrite( &item->messageFat.size, (uint16_t)size );
+    TracyQueueFat( &item->messageFat.text, (uint64_t)txt );
+    TracyQueueFat( &item->messageFat.size, (uint16_t)size );
     TracyQueueCommit( messageFatThread );
     return 0;
 }

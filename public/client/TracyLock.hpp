@@ -142,12 +142,13 @@ public:
     tracy_force_inline void CustomName( const char* name, size_t size )
     {
         assert( size < (std::numeric_limits<uint16_t>::max)() );
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, name, size );
-        TracySerialPrepare( QueueType::LockName );
+
+        TracySerialBegin;
+        TracySerialSingleString( name, size );
+        TracySerialItem( QueueType::LockName );
         MemWrite( &item->lockNameFat.id, m_id );
-        MemWrite( &item->lockNameFat.name, (uint64_t)ptr );
-        MemWrite( &item->lockNameFat.size, (uint16_t)size );
+        TracySerialFat( &item->lockNameFat.name, (uint64_t)name );
+        TracySerialFat( &item->lockNameFat.size, (uint16_t)size );
         TracySerialDeferCommit;
     }
 
@@ -418,12 +419,13 @@ public:
     tracy_force_inline void CustomName( const char* name, size_t size )
     {
         assert( size < (std::numeric_limits<uint16_t>::max)() );
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, name, size );
-        TracySerialPrepare( QueueType::LockName );
+
+        TracySerialBegin;
+        TracySerialSingleString( name, size );
+        TracySerialItem( QueueType::LockName );
         MemWrite( &item->lockNameFat.id, m_id );
-        MemWrite( &item->lockNameFat.name, (uint64_t)ptr );
-        MemWrite( &item->lockNameFat.size, (uint16_t)size );
+        TracySerialFat( &item->lockNameFat.name, (uint64_t)name );
+        TracySerialFat( &item->lockNameFat.size, (uint16_t)size );
         TracySerialDeferCommit;
     }
 

@@ -127,28 +127,57 @@ struct LuaZoneState
     auto& __tail = __token->get_tail_index(); \
     tracy::QueueItem* item = nullptr;
 
+#define TracyLfqSingleString( _ptr, _len ) \
+    assert( _len < std::numeric_limits<uint16_t>::max() ); \
+    auto __ptr2 = (char*)tracy::tracy_malloc( _len ); \
+    memcpy( __ptr2, _ptr, _len ); \
+    _ptr = __ptr2;
+
+#define TracyLfqSingleStringLenNT( _ptr, _len ) \
+    assert( _len < std::numeric_limits<uint16_t>::max() ); \
+    auto _ptr = (char*)tracy::tracy_malloc( _len + 1 );
+
 #define TracyLfqItem( _type ) \
     if (item) { __tail.store( __magic + 1, std::memory_order_release ); } \
     item = __token->enqueue_begin( __magic ); \
     tracy::MemWrite( &item->hdr.type, _type );
+
+#define TracyLfqFat( _ptr, _value ) \
+    tracy::MemWrite( _ptr, _value );
 
 #define TracyLfqCommit \
     __tail.store( __magic + 1, std::memory_order_release );
 
 
 #define TracyLfqBeginC TracyLfqBegin
+#define TracyLfqSingleStringC( _ptr, _len ) TracyLfqSingleString( _ptr, _len )
+#define TracyLfqSingleStringLenNTC( _ptr, _len ) TracyLfqSingleStringLenNT( _ptr, _len )
 #define TracyLfqItemC( _type ) TracyLfqItem( _type )
+#define TracyLfqFatC( _ptr, _value ) TracyLfqFat( _ptr, _value )
 #define TracyLfqCommitC TracyLfqCommit
 
 
 #define TracySerialBegin \
     tracy::QueueItem* item = nullptr;
+#define TracySerialSingleString( _ptr, _len ) \
+    assert( _len < std::numeric_limits<uint16_t>::max() ); \
+    auto __ptr2 = (char*)tracy::tracy_malloc( _len ); \
+    memcpy( __ptr2, _ptr, _len ); \
+    _ptr = __ptr2;
+#define TracySerialSingleStringLenNT( _ptr, _len ) \
+    assert( _len < std::numeric_limits<uint16_t>::max() ); \
+    auto _ptr = (char*)tracy::tracy_malloc( _len + 1 );
+#define TracySerialSrcLoc( _srcloc )
+#define TracySerialSrcLocUnfilled( _srcloc, _size ) \
+    uint64_t _srcloc = uint64_t( tracy::tracy_malloc(_size) );
 #define TracySerialItem( _type ) \
     item = tracy::Profiler::QueueSerial( item ); \
     tracy::MemWrite( &item->hdr.type, _type );
 #define TracySerialItemCallstack( _type, _callstack ) \
     item = tracy::Profiler::QueueSerialCallstack( _callstack, item ); \
     tracy::MemWrite( &item->hdr.type, _type );
+#define TracySerialFat( _ptr, _value ) \
+    tracy::MemWrite( _ptr, _value );
 #define TracySerialCommit \
     tracy::Profiler::QueueSerialFinish();
 
@@ -176,14 +205,19 @@ struct LuaZoneState
 
 #  define TracyQueueBegin \
     TracySerialBegin;
+#  define TracyQueueSingleString( _ptr, _len ) TracySerialSingleString( _ptr, _len )
+#  define TracyQueueSingleStringLenNT( _ptr, _len ) TracySerialSingleStringLenNT( _ptr, _len )
 #  define TracyQueueItem( _type ) TracySerialItem( _type )
+#  define TracyQueueFat( _ptr, _value ) TracySerialFat( _ptr, _value )
 #  define TracyQueueCommit( _name ) \
     tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
     TracySerialCommit;
 
 #  define TracyQueueBeginC \
     TracySerialBegin;
+#  define TracyQueueSingleStringC( _ptr, _len ) TracySerialSingleString( _ptr, _len )
 #  define TracyQueueItemC( _type ) TracySerialItem( _type )
+#  define TracyQueueFatC( _ptr, _value ) TracySerialFat( _ptr, _value )
 #  define TracyQueueCommitC( _name ) \
     tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
     TracySerialCommit;
@@ -191,10 +225,15 @@ struct LuaZoneState
 #else
 
 #  define TracyQueueBegin TracyLfqBegin
+#  define TracyQueueSingleString( _ptr, _len ) TracyLfqSingleString( _ptr, _len )
+#  define TracyQueueSingleStringLenNT( _ptr, _len ) TracyLfqSingleStringLenNT( _ptr, _len )
 #  define TracyQueueItem( _type ) TracyLfqItem( _type )
+#  define TracyQueueFat( _ptr, _value ) TracyLfqFat( _ptr, _value )
 #  define TracyQueueCommit( _name ) TracyLfqCommit
 #  define TracyQueueBeginC TracyLfqBeginC
+#  define TracyQueueSingleStringC( _ptr, _len ) TracyLfqSingleStringC( _ptr, _len )
 #  define TracyQueueItemC( _type ) TracyLfqItemC( _type )
+#  define TracyQueueFatC( _ptr, _value ) TracyLfqFatC( _ptr, _value )
 #  define TracyQueueCommitC( _name ) TracyLfqCommitC
 
 #endif
@@ -457,13 +496,13 @@ public:
             tracy::GetProfiler().SendCallstack( callstack_depth );
         }
 
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, txt, size );
 
-        TracyQueuePrepare( callstack_depth == 0 ? QueueType::Message : QueueType::MessageCallstack );
+        TracyQueueBegin;
+        TracyQueueSingleString( txt, size );
+        TracyQueueItem( callstack_depth == 0 ? QueueType::Message : QueueType::MessageCallstack );
         MemWrite( &item->messageFat.time, GetTime() );
-        MemWrite( &item->messageFat.text, (uint64_t)ptr );
-        MemWrite( &item->messageFat.size, (uint16_t)size );
+        TracyQueueFat( &item->messageFat.text, (uint64_t)txt );
+        TracyQueueFat( &item->messageFat.size, (uint16_t)size );
         TracyQueueCommit( messageFatThread );
     }
 
@@ -494,16 +533,15 @@ public:
             tracy::GetProfiler().SendCallstack( callstack_depth );
         }
 
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, txt, size );
-
-        TracyQueuePrepare( callstack_depth == 0 ? QueueType::MessageColor : QueueType::MessageColorCallstack );
+        TracyQueueBegin;
+        TracyQueueSingleString( txt, size );
+        TracyQueueItem( callstack_depth == 0 ? QueueType::MessageColor : QueueType::MessageColorCallstack );
         MemWrite( &item->messageColorFat.time, GetTime() );
-        MemWrite( &item->messageColorFat.text, (uint64_t)ptr );
         MemWrite( &item->messageColorFat.b, uint8_t( ( color       ) & 0xFF ) );
         MemWrite( &item->messageColorFat.g, uint8_t( ( color >> 8  ) & 0xFF ) );
         MemWrite( &item->messageColorFat.r, uint8_t( ( color >> 16 ) & 0xFF ) );
-        MemWrite( &item->messageColorFat.size, (uint16_t)size );
+        TracyQueueFat( &item->messageColorFat.text, (uint64_t)txt );
+        TracyQueueFat( &item->messageColorFat.size, (uint16_t)size );
         TracyQueueCommit( messageColorFatThread );
     }
 
@@ -529,12 +567,12 @@ public:
     static tracy_force_inline void MessageAppInfo( const char* txt, size_t size )
     {
         assert( size < (std::numeric_limits<uint16_t>::max)() );
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, txt, size );
-        TracyLfqPrepare( QueueType::MessageAppInfo );
+        TracyLfqBegin;
+        TracyLfqSingleString( txt, size );
+        TracyLfqItem( QueueType::MessageAppInfo );
         MemWrite( &item->messageFat.time, GetTime() );
-        MemWrite( &item->messageFat.text, (uint64_t)ptr );
-        MemWrite( &item->messageFat.size, (uint16_t)size );
+        TracyLfqFat( &item->messageFat.text, (uint64_t)txt );
+        TracyLfqFat( &item->messageFat.size, (uint16_t)size );
         TracyLfqDeferCommit;
     }
 

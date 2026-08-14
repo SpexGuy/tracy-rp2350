@@ -121,13 +121,12 @@ public:
 
     void Name( const char* name, uint16_t len )
     {
-        auto ptr = (char*)tracy_malloc( len );
-        memcpy( ptr, name, len );
-
-        TracyLfqPrepare( QueueType::GpuContextName );
+        TracyLfqBegin;
+        TracyLfqSingleString( name, len );
+        TracyLfqItem( QueueType::GpuContextName );
         MemWrite( &item->gpuContextNameFat.context, m_context );
-        MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
-        MemWrite( &item->gpuContextNameFat.size, len );
+        TracyLfqFat( &item->gpuContextNameFat.ptr, (uint64_t)name );
+        TracyLfqFat( &item->gpuContextNameFat.size, len );
         TracyLfqDeferCommit;
     }
 

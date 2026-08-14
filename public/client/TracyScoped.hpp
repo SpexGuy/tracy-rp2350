@@ -97,11 +97,11 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( GetProfiler().ConnectionId() != m_connectionId ) return;
 #endif
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, txt, size );
-        TracyQueuePrepare( QueueType::ZoneText );
-        MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-        MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+        TracyQueueBegin;
+        TracyQueueSingleString( txt, size );
+        TracyQueueItem( QueueType::ZoneText );
+        TracyQueueFat( &item->zoneTextFat.text, (uint64_t)txt );
+        TracyQueueFat( &item->zoneTextFat.size, (uint16_t)size );
         TracyQueueCommit( zoneTextFatThread );
     }
 
@@ -118,14 +118,16 @@ public:
         if( size < 0 ) return;
         assert( size < (std::numeric_limits<uint16_t>::max)() );
 
-        char* ptr = (char*)tracy_malloc( size_t( size ) + 1 );
+        TracyQueueBegin;
+        TracyQueueSingleStringLenNT( ptr, size );
+
         va_start( args, fmt );
         vsnprintf( ptr, size_t( size ) + 1, fmt, args );
         va_end( args );
 
-        TracyQueuePrepare( QueueType::ZoneText );
-        MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-        MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+        TracyQueueItem( QueueType::ZoneText );
+        TracyQueueFat( &item->zoneTextFat.text, (uint64_t)ptr );
+        TracyQueueFat( &item->zoneTextFat.size, (uint16_t)size );
         TracyQueueCommit( zoneTextFatThread );
     }
 
@@ -136,11 +138,11 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( GetProfiler().ConnectionId() != m_connectionId ) return;
 #endif
-        auto ptr = (char*)tracy_malloc( size );
-        memcpy( ptr, txt, size );
-        TracyQueuePrepare( QueueType::ZoneName );
-        MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-        MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+        TracyQueueBegin;
+        TracyQueueSingleString( txt, size );
+        TracyQueueItem( QueueType::ZoneName );
+        TracyQueueFat( &item->zoneTextFat.text, (uint64_t)txt );
+        TracyQueueFat( &item->zoneTextFat.size, (uint16_t)size );
         TracyQueueCommit( zoneTextFatThread );
     }
 
@@ -157,14 +159,16 @@ public:
         if( size < 0 ) return;
         assert( size < (std::numeric_limits<uint16_t>::max)() );
 
-        char* ptr = (char*)tracy_malloc( size_t( size ) + 1 );
+        TracyQueueBegin;
+        TracyQueueSingleStringLenNT( ptr, size );
+
         va_start( args, fmt );
         vsnprintf( ptr, size_t( size ) + 1, fmt, args );
         va_end( args );
 
-        TracyQueuePrepare( QueueType::ZoneName );
-        MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-        MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+        TracyQueueItem( QueueType::ZoneName );
+        TracyQueueFat( &item->zoneTextFat.text, (uint64_t)ptr );
+        TracyQueueFat( &item->zoneTextFat.size, (uint16_t)size );
         TracyQueueCommit( zoneTextFatThread );
     }
 

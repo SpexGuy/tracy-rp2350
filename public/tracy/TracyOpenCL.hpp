@@ -119,13 +119,12 @@ namespace tracy {
 
         void Name( const char* name, uint16_t len )
         {
-            auto ptr = (char*)tracy_malloc( len );
-            memcpy( ptr, name, len );
-
-            TracySerialPrepare( QueueType::GpuContextName );
+            TracySerialBegin;
+            TracySerialSingleString( name, len );
+            TracySerialItem( QueueType::GpuContextName );
             MemWrite( &item->gpuContextNameFat.context, (uint8_t)m_contextId );
-            MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
-            MemWrite( &item->gpuContextNameFat.size, len );
+            TracySerialFat( &item->gpuContextNameFat.ptr, (uint64_t)name );
+            TracySerialFat( &item->gpuContextNameFat.size, len );
             TracySerialDeferCommit;
         }
 

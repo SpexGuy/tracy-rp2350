@@ -4402,8 +4402,6 @@ TRACY_API void ___tracy_emit_zone_text( TracyCZoneCtx ctx, const char* txt, size
 {
     assert( size < std::numeric_limits<uint16_t>::max() );
     if( !ctx.active ) return;
-    auto ptr = (char*)tracy::tracy_malloc( size );
-    memcpy( ptr, txt, size );
 #ifndef TRACY_NO_VERIFY
     {
         TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
@@ -4412,9 +4410,11 @@ TRACY_API void ___tracy_emit_zone_text( TracyCZoneCtx ctx, const char* txt, size
     }
 #endif
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneText );
-        tracy::MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-        tracy::MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+        TracyQueueBeginC;
+        TracyQueueSingleStringC( txt, size );
+        TracyQueueItemC( tracy::QueueType::ZoneText );
+        TracyQueueFatC( &item->zoneTextFat.text, (uint64_t)txt );
+        TracyQueueFatC( &item->zoneTextFat.size, (uint16_t)size );
         TracyQueueCommitC( zoneTextFatThread );
     }
 }
@@ -4423,8 +4423,6 @@ TRACY_API void ___tracy_emit_zone_name( TracyCZoneCtx ctx, const char* txt, size
 {
     assert( size < std::numeric_limits<uint16_t>::max() );
     if( !ctx.active ) return;
-    auto ptr = (char*)tracy::tracy_malloc( size );
-    memcpy( ptr, txt, size );
 #ifndef TRACY_NO_VERIFY
     {
         TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
@@ -4433,9 +4431,11 @@ TRACY_API void ___tracy_emit_zone_name( TracyCZoneCtx ctx, const char* txt, size
     }
 #endif
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneName );
-        tracy::MemWrite( &item->zoneTextFat.text, (uint64_t)ptr );
-        tracy::MemWrite( &item->zoneTextFat.size, (uint16_t)size );
+        TracyQueueBeginC;
+        TracyQueueSingleStringC( txt, size );
+        TracyQueueItemC( tracy::QueueType::ZoneName );
+        TracyQueueFatC( &item->zoneTextFat.text, (uint64_t)txt );
+        TracyQueueFatC( &item->zoneTextFat.size, (uint16_t)size );
         TracyQueueCommitC( zoneTextFatThread );
     }
 }
@@ -4637,13 +4637,14 @@ TRACY_API void ___tracy_emit_gpu_new_context( ___tracy_gpu_new_context_data data
 
 TRACY_API void ___tracy_emit_gpu_context_name( const struct ___tracy_gpu_context_name_data data )
 {
-    auto ptr = (char*)tracy::tracy_malloc( data.len );
-    memcpy( ptr, data.name, data.len );
+    auto ptr = data.name;
 
-    TracyLfqPrepareC( tracy::QueueType::GpuContextName );
+    TracyLfqBeginC;
+    TracyLfqSingleStringC( ptr, data.len )
+    TracyLfqItemC( tracy::QueueType::GpuContextName );
     tracy::MemWrite( &item->gpuContextNameFat.context, data.context );
-    tracy::MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
-    tracy::MemWrite( &item->gpuContextNameFat.size, data.len );
+    TracyLfqFatC( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
+    TracyLfqFatC( &item->gpuContextNameFat.size, data.len );
     TracyLfqDeferCommit;
 }
 
@@ -4744,13 +4745,14 @@ TRACY_API void ___tracy_emit_gpu_new_context_serial( ___tracy_gpu_new_context_da
 
 TRACY_API void ___tracy_emit_gpu_context_name_serial( const struct ___tracy_gpu_context_name_data data )
 {
-    auto ptr = (char*)tracy::tracy_malloc( data.len );
-    memcpy( ptr, data.name, data.len );
+    auto ptr = data.name;
 
-    TracySerialPrepare( tracy::QueueType::GpuContextName );
+    TracySerialBegin;
+    TracySerialSingleString( ptr, data.len );
+    TracySerialItem( tracy::QueueType::GpuContextName );
     tracy::MemWrite( &item->gpuContextNameFat.context, data.context );
-    tracy::MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
-    tracy::MemWrite( &item->gpuContextNameFat.size, data.len );
+    TracySerialFat( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
+    TracySerialFat( &item->gpuContextNameFat.size, data.len );
     TracySerialDeferCommit;
 }
 
@@ -4916,12 +4918,13 @@ TRACY_API void ___tracy_mark_lockable_ctx( struct __tracy_lockable_context_data*
 TRACY_API void ___tracy_custom_name_lockable_ctx( struct __tracy_lockable_context_data* lockdata, const char* name, size_t nameSz )
 {
     assert( nameSz < (std::numeric_limits<uint16_t>::max)() );
-    auto ptr = (char*)tracy::tracy_malloc( nameSz );
-    memcpy( ptr, name, nameSz );
-    TracySerialPrepare( tracy::QueueType::LockName );
+
+    TracySerialBegin;
+    TracySerialSingleString( name, nameSz );
+    TracySerialItem( tracy::QueueType::LockName );
     tracy::MemWrite( &item->lockNameFat.id, lockdata->m_id );
-    tracy::MemWrite( &item->lockNameFat.name, (uint64_t)ptr );
-    tracy::MemWrite( &item->lockNameFat.size, (uint16_t)nameSz );
+    TracySerialFat( &item->lockNameFat.name, (uint64_t)name );
+    TracySerialFat( &item->lockNameFat.size, (uint16_t)nameSz );
     TracySerialDeferCommit;
 }
 
