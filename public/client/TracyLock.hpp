@@ -23,16 +23,12 @@ public:
     {
         assert( m_id != (std::numeric_limits<uint32_t>::max)() );
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockAnnounce );
+        TracySerialPrepare( QueueType::LockAnnounce );
         MemWrite( &item->lockAnnounce.id, m_id );
         MemWrite( &item->lockAnnounce.time, Profiler::GetTime() );
         MemWrite( &item->lockAnnounce.lckloc, (uint64_t)srcloc );
         MemWrite( &item->lockAnnounce.type, LockType::Lockable );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     LockableCtx( const LockableCtx& ) = delete;
@@ -40,14 +36,10 @@ public:
 
     tracy_force_inline ~LockableCtx()
     {
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockTerminate );
+        TracySerialPrepare( QueueType::LockTerminate );
         MemWrite( &item->lockTerminate.id, m_id );
         MemWrite( &item->lockTerminate.time, Profiler::GetTime() );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     tracy_force_inline bool BeforeLock()
@@ -65,23 +57,21 @@ public:
         if( !queue ) return false;
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockWait );
+        TracySerialPrepare( QueueType::LockWait );
         MemWrite( &item->lockWait.thread, GetThreadHandle() );
         MemWrite( &item->lockWait.id, m_id );
         MemWrite( &item->lockWait.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
         return true;
     }
 
     tracy_force_inline void AfterLock()
     {
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockObtain );
+        TracySerialPrepare( QueueType::LockObtain );
         MemWrite( &item->lockObtain.thread, GetThreadHandle() );
         MemWrite( &item->lockObtain.id, m_id );
         MemWrite( &item->lockObtain.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void AfterUnlock()
@@ -96,11 +86,10 @@ public:
         }
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockRelease );
+        TracySerialPrepare( QueueType::LockRelease );
         MemWrite( &item->lockRelease.id, m_id );
         MemWrite( &item->lockRelease.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void AfterTryLock( bool acquired )
@@ -122,12 +111,11 @@ public:
 
         if( acquired )
         {
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::LockObtain );
+            TracySerialPrepare( QueueType::LockObtain );
             MemWrite( &item->lockObtain.thread, GetThreadHandle() );
             MemWrite( &item->lockObtain.id, m_id );
             MemWrite( &item->lockObtain.time, Profiler::GetTime() );
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
     }
 
@@ -144,12 +132,11 @@ public:
         }
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockMark );
+        TracySerialPrepare( QueueType::LockMark );
         MemWrite( &item->lockMark.thread, GetThreadHandle() );
         MemWrite( &item->lockMark.id, m_id );
         MemWrite( &item->lockMark.srcloc, (uint64_t)srcloc );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void CustomName( const char* name, size_t size )
@@ -157,15 +144,11 @@ public:
         assert( size < (std::numeric_limits<uint16_t>::max)() );
         auto ptr = (char*)tracy_malloc( size );
         memcpy( ptr, name, size );
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockName );
+        TracySerialPrepare( QueueType::LockName );
         MemWrite( &item->lockNameFat.id, m_id );
         MemWrite( &item->lockNameFat.name, (uint64_t)ptr );
         MemWrite( &item->lockNameFat.size, (uint16_t)size );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
 private:
@@ -238,16 +221,12 @@ public:
     {
         assert( m_id != (std::numeric_limits<uint32_t>::max)() );
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockAnnounce );
+        TracySerialPrepare( QueueType::LockAnnounce );
         MemWrite( &item->lockAnnounce.id, m_id );
         MemWrite( &item->lockAnnounce.time, Profiler::GetTime() );
         MemWrite( &item->lockAnnounce.lckloc, (uint64_t)srcloc );
         MemWrite( &item->lockAnnounce.type, LockType::SharedLockable );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     SharedLockableCtx( const SharedLockableCtx& ) = delete;
@@ -255,14 +234,10 @@ public:
 
     tracy_force_inline ~SharedLockableCtx()
     {
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockTerminate );
+        TracySerialPrepare( QueueType::LockTerminate );
         MemWrite( &item->lockTerminate.id, m_id );
         MemWrite( &item->lockTerminate.time, Profiler::GetTime() );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     tracy_force_inline bool BeforeLock()
@@ -280,23 +255,21 @@ public:
         if( !queue ) return false;
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockWait );
+        TracySerialPrepare( QueueType::LockWait );
         MemWrite( &item->lockWait.thread, GetThreadHandle() );
         MemWrite( &item->lockWait.id, m_id );
         MemWrite( &item->lockWait.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
         return true;
     }
 
     tracy_force_inline void AfterLock()
     {
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockObtain );
+        TracySerialPrepare( QueueType::LockObtain );
         MemWrite( &item->lockObtain.thread, GetThreadHandle() );
         MemWrite( &item->lockObtain.id, m_id );
         MemWrite( &item->lockObtain.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void AfterUnlock()
@@ -311,11 +284,10 @@ public:
         }
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockRelease );
+        TracySerialPrepare( QueueType::LockRelease );
         MemWrite( &item->lockRelease.id, m_id );
         MemWrite( &item->lockRelease.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void AfterTryLock( bool acquired )
@@ -337,12 +309,11 @@ public:
 
         if( acquired )
         {
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::LockObtain );
+            TracySerialPrepare( QueueType::LockObtain );
             MemWrite( &item->lockObtain.thread, GetThreadHandle() );
             MemWrite( &item->lockObtain.id, m_id );
             MemWrite( &item->lockObtain.time, Profiler::GetTime() );
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
     }
 
@@ -361,23 +332,21 @@ public:
         if( !queue ) return false;
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockSharedWait );
+        TracySerialPrepare( QueueType::LockSharedWait );
         MemWrite( &item->lockWait.thread, GetThreadHandle() );
         MemWrite( &item->lockWait.id, m_id );
         MemWrite( &item->lockWait.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
         return true;
     }
 
     tracy_force_inline void AfterLockShared()
     {
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockSharedObtain );
+        TracySerialPrepare( QueueType::LockSharedObtain );
         MemWrite( &item->lockObtain.thread, GetThreadHandle() );
         MemWrite( &item->lockObtain.id, m_id );
         MemWrite( &item->lockObtain.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void AfterUnlockShared()
@@ -392,12 +361,11 @@ public:
         }
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockSharedRelease );
+        TracySerialPrepare( QueueType::LockSharedRelease );
         MemWrite( &item->lockReleaseShared.thread, GetThreadHandle() );
         MemWrite( &item->lockReleaseShared.id, m_id );
         MemWrite( &item->lockReleaseShared.time, Profiler::GetTime() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void AfterTryLockShared( bool acquired )
@@ -419,12 +387,11 @@ public:
 
         if( acquired )
         {
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::LockSharedObtain );
+            TracySerialPrepare( QueueType::LockSharedObtain );
             MemWrite( &item->lockObtain.thread, GetThreadHandle() );
             MemWrite( &item->lockObtain.id, m_id );
             MemWrite( &item->lockObtain.time, Profiler::GetTime() );
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
     }
 
@@ -441,12 +408,11 @@ public:
         }
 #endif
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockMark );
+        TracySerialPrepare( QueueType::LockMark );
         MemWrite( &item->lockMark.thread, GetThreadHandle() );
         MemWrite( &item->lockMark.id, m_id );
         MemWrite( &item->lockMark.srcloc, (uint64_t)srcloc );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline void CustomName( const char* name, size_t size )
@@ -454,15 +420,11 @@ public:
         assert( size < (std::numeric_limits<uint16_t>::max)() );
         auto ptr = (char*)tracy_malloc( size );
         memcpy( ptr, name, size );
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::LockName );
+        TracySerialPrepare( QueueType::LockName );
         MemWrite( &item->lockNameFat.id, m_id );
         MemWrite( &item->lockNameFat.name, (uint64_t)ptr );
         MemWrite( &item->lockNameFat.size, (uint16_t)size );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
 private:

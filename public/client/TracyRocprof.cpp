@@ -96,8 +96,7 @@ uint8_t gpu_context_allocate( ToolData* data )
     context_flags |= tracy::GpuContextCalibration;
 #endif
     {
-        auto* item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuNewContext );
+        TracySerialPrepare( tracy::QueueType::GpuNewContext );
         tracy::MemWrite( &item->gpuNewContext.cpuTime, cpu_timestamp );
         tracy::MemWrite( &item->gpuNewContext.gpuTime, gpu_timestamp );
         memset( &item->gpuNewContext.thread, 0, sizeof( item->gpuNewContext.thread ) );
@@ -105,7 +104,7 @@ uint8_t gpu_context_allocate( ToolData* data )
         tracy::MemWrite( &item->gpuNewContext.context, context_id );
         tracy::MemWrite( &item->gpuNewContext.flags, context_flags );
         tracy::MemWrite( &item->gpuNewContext.type, tracy::GpuContextType::Rocprof );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialCommit; // TODO should this defer?
     }
 
     // Send the name of the context along.
@@ -116,12 +115,11 @@ uint8_t gpu_context_allocate( ToolData* data )
     char* cloned_name = (char*)tracy::tracy_malloc( name_length );
     memcpy( cloned_name, CTX_NAME, name_length );
     {
-        auto* item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuContextName );
+        TracySerialPrepare( tracy::QueueType::GpuContextName );
         tracy::MemWrite( &item->gpuContextNameFat.context, context_id );
         tracy::MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)cloned_name );
         tracy::MemWrite( &item->gpuContextNameFat.size, name_length );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     return context_id;
@@ -179,57 +177,52 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
     if( src_loc != 0 )
     {
         {
-            auto* item = tracy::Profiler::QueueSerial();
-            tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
+            TracySerialPrepare( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
             tracy::MemWrite( &item->gpuZoneBegin.cpuTime, cpu_start_time );
             tracy::MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)src_loc );
             tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
             tracy::MemWrite( &item->gpuZoneBegin.queryId, query_id );
             tracy::MemWrite( &item->gpuZoneBegin.context, context_id );
-            tracy::Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
     }
     else
     {
         static const ___tracy_source_location_data src_loc = { NULL, NULL, NULL, 0, 0 };
         {
-            auto* item = tracy::Profiler::QueueSerial();
-            tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneBeginSerial );
+            TracySerialPrepare( tracy::QueueType::GpuZoneBeginSerial );
             tracy::MemWrite( &item->gpuZoneBegin.cpuTime, cpu_start_time );
             tracy::MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)&src_loc );
             tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
             tracy::MemWrite( &item->gpuZoneBegin.queryId, query_id );
             tracy::MemWrite( &item->gpuZoneBegin.context, context_id );
-            tracy::Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
     }
 
     {
-        auto* item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuTime );
+        TracySerialPrepare( tracy::QueueType::GpuTime );
         tracy::MemWrite( &item->gpuTime.gpuTime, start_timestamp );
         tracy::MemWrite( &item->gpuTime.queryId, query_id );
         tracy::MemWrite( &item->gpuTime.context, context_id );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     {
-        auto* item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneEndSerial );
+        TracySerialPrepare( tracy::QueueType::GpuZoneEndSerial );
         tracy::MemWrite( &item->gpuZoneEnd.cpuTime, cpu_end_time );
         tracy::MemWrite( &item->gpuZoneEnd.thread, tracy::GetThreadHandle() );
         tracy::MemWrite( &item->gpuZoneEnd.queryId, query_id );
         tracy::MemWrite( &item->gpuZoneEnd.context, context_id );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     {
-        auto* item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuTime );
+        TracySerialPrepare( tracy::QueueType::GpuTime );
         tracy::MemWrite( &item->gpuTime.gpuTime, end_timestamp );
         tracy::MemWrite( &item->gpuTime.queryId, query_id );
         tracy::MemWrite( &item->gpuTime.context, context_id );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 }
 
@@ -264,14 +257,13 @@ void record_callback( rocprofiler_dispatch_counting_service_data_t dispatch_data
 
     for( auto& p : sums )
     {
-        auto* item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneAnnotation );
+        TracySerialPrepare( tracy::QueueType::GpuZoneAnnotation );
         tracy::MemWrite( &item->zoneAnnotation.noteId, p.first );
         tracy::MemWrite( &item->zoneAnnotation.queryId, query_id );
         tracy::MemWrite( &item->zoneAnnotation.thread, thread_id );
         tracy::MemWrite( &item->zoneAnnotation.value, p.second );
         tracy::MemWrite( &item->zoneAnnotation.context, data->context_id );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 }
 
@@ -353,13 +345,12 @@ void dispatch_callback( rocprofiler_dispatch_counting_service_data_t dispatch_da
             char* cloned_name = (char*)tracy::tracy_malloc( name_length );
             memcpy( cloned_name, info.name, name_length );
             {
-                auto* item = tracy::Profiler::QueueSerial();
-                tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuAnnotationName );
+                TracySerialPrepare( tracy::QueueType::GpuAnnotationName );
                 tracy::MemWrite( &item->gpuAnnotationNameFat.context, data->context_id );
                 tracy::MemWrite( &item->gpuAnnotationNameFat.noteId, counter.handle );
                 tracy::MemWrite( &item->gpuAnnotationNameFat.ptr, (uint64_t)cloned_name );
                 tracy::MemWrite( &item->gpuAnnotationNameFat.size, name_length );
-                tracy::Profiler::QueueSerialFinish();
+                TracySerialCommit;
             }
         }
     }
@@ -477,13 +468,12 @@ void calibration_thread( void* ptr )
 
         if( cpu_timestamp > data->previous_cpu_time )
         {
-            auto* item = tracy::Profiler::QueueSerial();
-            tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuCalibration );
+            TracySerialPrepare( tracy::QueueType::GpuCalibration );
             tracy::MemWrite( &item->gpuCalibration.gpuTime, gpu_timestamp );
             tracy::MemWrite( &item->gpuCalibration.cpuTime, cpu_timestamp );
             tracy::MemWrite( &item->gpuCalibration.cpuDelta, cpu_timestamp - data->previous_cpu_time );
             tracy::MemWrite( &item->gpuCalibration.context, data->context_id );
-            tracy::Profiler::QueueSerialFinish();
+            TracySerialCommit;
             data->previous_cpu_time = cpu_timestamp;
         }
     }

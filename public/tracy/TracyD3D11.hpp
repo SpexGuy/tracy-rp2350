@@ -125,8 +125,7 @@ public:
         m_immediateDevCtx->Begin(m_disjointQuery);
         m_previousCheckpoint = m_nextCheckpoint = 0;
 
-        auto* item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuNewContext );
+        TracySerialPrepare( QueueType::GpuNewContext );
         MemWrite( &item->gpuNewContext.cpuTime, tcpu );
         MemWrite( &item->gpuNewContext.gpuTime, tgpu );
         MemWrite( &item->gpuNewContext.thread, uint32_t(0) );   // #TODO: why not GetThreadHandle()?
@@ -134,12 +133,7 @@ public:
         MemWrite( &item->gpuNewContext.context, m_contextId);
         MemWrite( &item->gpuNewContext.flags, uint8_t(0) );
         MemWrite( &item->gpuNewContext.type, GpuContextType::Direct3D11 );
-
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     ~D3D11Ctx()
@@ -165,15 +159,11 @@ public:
         auto ptr = (char*)tracy_malloc( len );
         memcpy( ptr, name, len );
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuContextName );
+        TracySerialPrepare( QueueType::GpuContextName );
         MemWrite( &item->gpuContextNameFat.context, m_contextId );
         MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
         MemWrite( &item->gpuContextNameFat.size, len );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     void Collect(CollectMode mode = POLL)
@@ -229,12 +219,11 @@ public:
                 break;
             }
             timestamp *= (1000000000ull / disjoint.Frequency);
-            auto* item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuTime);
+            TracySerialPrepare(QueueType::GpuTime);
             MemWrite(&item->gpuTime.gpuTime, static_cast<int64_t>(timestamp));
             MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(k));
             MemWrite(&item->gpuTime.context, m_contextId);
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         // disjoint timestamp queries should only be invoked once per frame or less
@@ -365,13 +354,12 @@ public:
         const auto queryId = m_ctx->NextQueryId();
         m_ctx->m_immediateDevCtx->End(m_ctx->GetQueryObjectFromId(queryId));
 
-        auto* item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuZoneEndSerial );
+        TracySerialPrepare( QueueType::GpuZoneEndSerial );
         MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneEnd.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, m_ctx->GetContextId() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
 private:

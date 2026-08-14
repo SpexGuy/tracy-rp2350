@@ -145,12 +145,11 @@ public:
         auto ptr = (char*)tracy_malloc( len );
         memcpy( ptr, name, len );
 
-        auto* item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuContextName );
+        TracySerialPrepare( QueueType::GpuContextName );
         MemWrite( &item->gpuContextNameFat.context, m_contextId );
         MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
         MemWrite( &item->gpuContextNameFat.size, len );
-        SubmitQueueItem(item);
+        TracySerialDeferCommit;
     }
 
     bool Collect()
@@ -255,20 +254,18 @@ public:
             TracyMetalDebugMasked(1<<2, TracyFreeN((void*)(uintptr_t)(k+0), "TracyMetalGpuZone"));
             TracyMetalDebugMasked(1<<2, TracyFreeN((void*)(uintptr_t)(k+1), "TracyMetalGpuZone"));
             {
-            auto* item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuTime);
+            TracySerialPrepare(QueueType::GpuTime);
             MemWrite(&item->gpuTime.gpuTime, static_cast<int64_t>(t_start));
             MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(k));
             MemWrite(&item->gpuTime.context, m_contextId);
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
             }
             {
-            auto* item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuTime);
+            TracySerialPrepare(QueueType::GpuTime);
             MemWrite(&item->gpuTime.gpuTime, static_cast<int64_t>(t_end));
             MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(k+1));
             MemWrite(&item->gpuTime.context, m_contextId);
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
             }
             m_mostRecentTimestamp = (t_end > m_mostRecentTimestamp) ? t_end : m_mostRecentTimestamp;
             TracyMetalDebugMasked(1<<1, TracyFreeN((void*)(uintptr_t)k, "TracyMetalTimestampQueryId"));
@@ -344,8 +341,7 @@ private:
         
         m_contextId = GetGpuCtxCounter().fetch_add(1);
         
-        auto* item = Profiler::QueueSerial();
-        MemWrite(&item->hdr.type, QueueType::GpuNewContext);
+        TracySerialPrepare(QueueType::GpuNewContext);
         MemWrite(&item->gpuNewContext.cpuTime, int64_t(cpuTimestamp));
         MemWrite(&item->gpuNewContext.gpuTime, int64_t(gpuTimestamp));
         MemWrite(&item->gpuNewContext.thread, uint32_t(0)); // TODO: why not GetThreadHandle()?
@@ -354,7 +350,7 @@ private:
         //MemWrite(&item->gpuNewContext.flags, GpuContextCalibration);
         MemWrite(&item->gpuNewContext.flags, GpuContextFlags(0));
         MemWrite(&item->gpuNewContext.type, GpuContextType::Metal);
-        SubmitQueueItem(item);
+        TracySerialDeferCommit;
     }
 
     ~MetalCtx()
@@ -363,14 +359,6 @@ private:
         // TODO: add a timeout to this loop?
         while (m_previousCheckpoint.load() != m_queryCounter.load())
             Collect();
-    }
-
-    tracy_force_inline void SubmitQueueItem(QueueItem* item)
-    {
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem(*item);
-#endif
-        Profiler::QueueSerialFinish();
     }
 
     tracy_force_inline uint32_t RingIndex(uintptr_t index)
@@ -585,27 +573,25 @@ private:
     
     static void SubmitZoneBeginGpu(MetalCtx* ctx, uint32_t queryId, const SourceLocationData* srcloc)
     {
-        auto* item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuZoneBeginSerial );
+        TracySerialPrepare( QueueType::GpuZoneBeginSerial );
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, ctx->GetContextId() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
         
         TracyMetalDebugMasked(1<<2, TracyAllocN((void*)(uintptr_t)queryId, 1, "TracyMetalGpuZone"));
     }
     
     static void SubmitZoneEndGpu(MetalCtx* ctx, uint32_t queryId)
     {
-        auto* item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuZoneEndSerial );
+        TracySerialPrepare( QueueType::GpuZoneEndSerial );
         MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneEnd.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, ctx->GetContextId() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
         
         TracyMetalDebugMasked(1<<2, TracyAllocN((void*)(uintptr_t)queryId, 1, "TracyMetalGpuZone"));
     }

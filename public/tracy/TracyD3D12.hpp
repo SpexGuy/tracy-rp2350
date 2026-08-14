@@ -94,22 +94,13 @@ namespace tracy
 
                 cpuTimestamp = Profiler::GetTime();
 
-                auto* item = Profiler::QueueSerial();
-                MemWrite(&item->hdr.type, QueueType::GpuCalibration);
+                TracySerialPrepare(QueueType::GpuCalibration);
                 MemWrite(&item->gpuCalibration.gpuTime, gpuTimestamp);
                 MemWrite(&item->gpuCalibration.cpuTime, cpuTimestamp);
                 MemWrite(&item->gpuCalibration.cpuDelta, cpuDeltaNS);
                 MemWrite(&item->gpuCalibration.context, GetId());
-                SubmitQueueItem(item);
+                TracySerialDeferCommit;
             }
-        }
-
-        tracy_force_inline void SubmitQueueItem(tracy::QueueItem* item)
-        {
-#ifdef TRACY_ON_DEMAND
-            GetProfiler().DeferItem(*item);
-#endif
-            Profiler::QueueSerialFinish();
         }
 
     public:
@@ -206,8 +197,7 @@ namespace tracy
             // all checked: ready to roll
             m_contextId = GetGpuCtxCounter().fetch_add(1);
 
-            auto* item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuNewContext);
+            TracySerialPrepare(QueueType::GpuNewContext);
             MemWrite(&item->gpuNewContext.cpuTime, cpuTimestamp);
             MemWrite(&item->gpuNewContext.gpuTime, gpuTimestamp);
             MemWrite(&item->gpuNewContext.thread, decltype(item->gpuNewContext.thread)(0)); // #TODO: why 0 instead of GetThreadHandle()?
@@ -215,7 +205,7 @@ namespace tracy
             MemWrite(&item->gpuNewContext.context, GetId());
             MemWrite(&item->gpuNewContext.flags, GpuContextCalibration);
             MemWrite(&item->gpuNewContext.type, GpuContextType::Direct3D12);
-            SubmitQueueItem(item);
+            TracySerialDeferCommit;
         }
 
         ~D3D12QueueCtx()
@@ -250,12 +240,11 @@ namespace tracy
             auto ptr = (char*)tracy_malloc( len );
             memcpy( ptr, name, len );
 
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::GpuContextName );
+            TracySerialPrepare( QueueType::GpuContextName );
             MemWrite( &item->gpuContextNameFat.context, GetId());
             MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
             MemWrite( &item->gpuContextNameFat.size, len );
-            SubmitQueueItem(item);
+            TracySerialDeferCommit;
         }
 
         void Collect()
@@ -302,13 +291,11 @@ namespace tracy
                     const auto timestamp = timestampData[counter];
                     const auto queryId = counter;
 
-                    auto* item = Profiler::QueueSerial();
-                    MemWrite(&item->hdr.type, QueueType::GpuTime);
+                    TracySerialPrepare(QueueType::GpuTime);
                     MemWrite(&item->gpuTime.gpuTime, timestamp);
                     MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(queryId));
                     MemWrite(&item->gpuTime.context, GetId());
-
-                    Profiler::QueueSerialFinish();
+                    TracySerialCommit;
                 }
 
                 m_payloadQueue.pop();
@@ -423,13 +410,12 @@ namespace tracy
             const auto queryId = m_queryId + 1;  // Our end query slot is immediately after the begin slot.
             m_cmdList->EndQuery(m_ctx->m_queryHeap, D3D12_QUERY_TYPE_TIMESTAMP, queryId);
 
-            auto* item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuZoneEndSerial);
+            TracySerialPrepare( QueueType::GpuZoneEndSerial );
             MemWrite(&item->gpuZoneEnd.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneEnd.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneEnd.queryId, static_cast<uint16_t>(queryId));
             MemWrite(&item->gpuZoneEnd.context, m_ctx->GetId());
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
 
             m_cmdList->ResolveQueryData(m_ctx->m_queryHeap, D3D12_QUERY_TYPE_TIMESTAMP, m_queryId, 2, m_ctx->m_readbackBuffer, m_queryId * sizeof(uint64_t));
         }

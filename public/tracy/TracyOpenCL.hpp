@@ -106,8 +106,7 @@ namespace tracy {
             TRACY_CL_CHECK_ERROR(clReleaseMemObject(dummyBuffer));
             TRACY_CL_CHECK_ERROR(clReleaseCommandQueue(queue));
 
-            auto item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuNewContext);
+            TracySerialPrepare(QueueType::GpuNewContext);
             MemWrite(&item->gpuNewContext.cpuTime, tcpu);
             MemWrite(&item->gpuNewContext.gpuTime, tgpu);
             memset(&item->gpuNewContext.thread, 0, sizeof(item->gpuNewContext.thread));
@@ -115,10 +114,7 @@ namespace tracy {
             MemWrite(&item->gpuNewContext.type, GpuContextType::OpenCL);
             MemWrite(&item->gpuNewContext.context, (uint8_t) m_contextId);
             MemWrite(&item->gpuNewContext.flags, (uint8_t)0);
-#ifdef TRACY_ON_DEMAND
-            GetProfiler().DeferItem(*item);
-#endif
-            Profiler::QueueSerialFinish();
+            TracySerialDeferCommit;
         }
 
         void Name( const char* name, uint16_t len )
@@ -126,15 +122,11 @@ namespace tracy {
             auto ptr = (char*)tracy_malloc( len );
             memcpy( ptr, name, len );
 
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::GpuContextName );
+            TracySerialPrepare( QueueType::GpuContextName );
             MemWrite( &item->gpuContextNameFat.context, (uint8_t)m_contextId );
             MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
             MemWrite( &item->gpuContextNameFat.size, len );
-#ifdef TRACY_ON_DEMAND
-            GetProfiler().DeferItem( *item );
-#endif
-            Profiler::QueueSerialFinish();
+            TracySerialDeferCommit;
         }
 
         void Collect()
@@ -185,12 +177,11 @@ namespace tracy {
 
                 TRACY_CL_ASSERT(eventTimeStamp != 0);
 
-                auto item = Profiler::QueueSerial();
-                MemWrite(&item->hdr.type, QueueType::GpuTime);
+                TracySerialPrepare(QueueType::GpuTime);
                 MemWrite(&item->gpuTime.gpuTime, (int64_t)eventTimeStamp);
                 MemWrite(&item->gpuTime.queryId, (uint16_t)m_tail);
                 MemWrite(&item->gpuTime.context, m_contextId);
-                Profiler::QueueSerialFinish();
+                TracySerialCommit;
 
                 if (eventInfo.phase == EventPhase::End)
                 {
@@ -245,14 +236,13 @@ namespace tracy {
 
             m_beginQueryId = ctx->NextQueryId(EventInfo{ nullptr, EventPhase::Begin });
 
-            auto item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuZoneBeginSerial);
+            TracySerialPrepare( QueueType::GpuZoneBeginSerial );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)srcLoc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)m_beginQueryId);
             MemWrite(&item->gpuZoneBegin.context, ctx->GetId());
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         tracy_force_inline OpenCLCtxScope(OpenCLCtx* ctx, const SourceLocationData* srcLoc, int32_t depth, bool is_active)
@@ -270,14 +260,13 @@ namespace tracy {
 
             GetProfiler().SendCallstack(depth);
 
-            auto item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuZoneBeginCallstackSerial);
+            TracySerialPrepare(QueueType::GpuZoneBeginCallstackSerial);
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)srcLoc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)m_beginQueryId);
             MemWrite(&item->gpuZoneBegin.context, ctx->GetId());
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         tracy_force_inline OpenCLCtxScope(OpenCLCtx* ctx, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, bool is_active)
@@ -294,14 +283,13 @@ namespace tracy {
             m_beginQueryId = ctx->NextQueryId(EventInfo{ nullptr, EventPhase::Begin });
 
             const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::GpuZoneBeginAllocSrcLocSerial );
+            TracySerialPrepare( QueueType::GpuZoneBeginAllocSrcLocSerial );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneBegin.srcloc, srcloc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)m_beginQueryId);
             MemWrite(&item->gpuZoneBegin.context, ctx->GetId());
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         tracy_force_inline OpenCLCtxScope(OpenCLCtx* ctx, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, int32_t depth, bool is_active)
@@ -318,14 +306,13 @@ namespace tracy {
             m_beginQueryId = ctx->NextQueryId(EventInfo{ nullptr, EventPhase::Begin });
 
             const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-            auto item = Profiler::QueueSerialCallstack( Callstack( depth ) );
-            MemWrite(&item->hdr.type, QueueType::GpuZoneBeginAllocSrcLocCallstackSerial);
+            TracySerialPrepareCallstack( QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, Callstack( depth ) );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneBegin.srcloc, srcloc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)m_beginQueryId);
             MemWrite(&item->gpuZoneBegin.context, ctx->GetId());
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         tracy_force_inline void SetEvent(cl_event event)
@@ -341,13 +328,12 @@ namespace tracy {
             if (!m_active) return;
             const auto queryId = m_ctx->NextQueryId(EventInfo{ m_event, EventPhase::End });
 
-            auto item = Profiler::QueueSerial();
-            MemWrite(&item->hdr.type, QueueType::GpuZoneEndSerial);
+            TracySerialPrepare(QueueType::GpuZoneEndSerial);
             MemWrite(&item->gpuZoneEnd.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneEnd.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneEnd.queryId, (uint16_t)queryId);
             MemWrite(&item->gpuZoneEnd.context, m_ctx->GetId());
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         const bool m_active;

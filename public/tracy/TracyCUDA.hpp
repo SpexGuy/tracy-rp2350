@@ -183,13 +183,11 @@ void tracyEmitMemAlloc(const char* name, const void* ptr, size_t size, TracyTime
     using namespace tracy;
     const auto thread = GetThreadHandle();
 
-    auto item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::MemNamePayload);
+    TracySerialPrepare(QueueType::MemNamePayload);
     tracyMemWrite(item->memName.name, (uint64_t)name);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 
-    item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::MemAllocNamed);
+    TracySerialPrepare(QueueType::MemAllocNamed);
     tracyMemWrite(item->memAlloc.time, time);
     tracyMemWrite(item->memAlloc.thread, thread);
     tracyMemWrite(item->memAlloc.ptr, (uint64_t)ptr);
@@ -205,24 +203,22 @@ void tracyEmitMemAlloc(const char* name, const void* ptr, size_t size, TracyTime
         memcpy(&item->memAlloc.size, &size, 4);
         memcpy(((char *)&item->memAlloc.size) + 4, ((char *)&size) + 4, 2);
     }
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 void tracyEmitMemFree(const char* name, const void* ptr, TracyTimestamp time) {
     using namespace tracy;
     const auto thread = GetThreadHandle();
 
-    auto item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::MemNamePayload);
+    TracySerialPrepare(QueueType::MemNamePayload);
     tracyMemWrite(item->memName.name, (uint64_t)name);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 
-    item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::MemFreeNamed);
+    TracySerialPrepare(QueueType::MemFreeNamed)
     tracyMemWrite(item->memFree.time, time);
     tracyMemWrite(item->memFree.thread, thread);
     tracyMemWrite(item->memFree.ptr, (uint64_t)ptr);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 void tracyEmitMemAlloc(const char* name, const void* ptr, size_t size, CUptiTimestamp cuptiTime) {
@@ -238,41 +234,37 @@ void tracyAnnounceGpuTimestamp(TracyTimestamp apiStart, TracyTimestamp apiEnd,
     const tracy::SourceLocationData* sourceLocation, uint32_t threadId) {
     using namespace tracy;
 
-    auto item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::GpuZoneBeginSerial);
+    TracySerialPrepare(QueueType::GpuZoneBeginSerial);
     tracyMemWrite(item->gpuZoneBegin.cpuTime, apiStart);
     tracyMemWrite(item->gpuZoneBegin.srcloc, (uint64_t)sourceLocation);
     tracyMemWrite(item->gpuZoneBegin.thread, threadId);
     tracyMemWrite(item->gpuZoneBegin.queryId, uint16_t(queryId+0));
     tracyMemWrite(item->gpuZoneBegin.context, gpuContextId);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 
-    item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::GpuZoneEndSerial);
+    TracySerialPrepare(QueueType::GpuZoneEndSerial);
     tracyMemWrite(item->gpuZoneEnd.cpuTime, apiEnd);
     tracyMemWrite(item->gpuZoneEnd.thread, threadId);
     tracyMemWrite(item->gpuZoneEnd.queryId, uint16_t(queryId+1));
     tracyMemWrite(item->gpuZoneEnd.context, gpuContextId);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 void tracySubmitGpuTimestamp(CUptiTimestamp gpuStart, CUptiTimestamp gpuEnd,
     uint16_t queryId, uint8_t gpuContextId) {
     using namespace tracy;
 
-    auto item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::GpuTime);
+    TracySerialPrepare(QueueType::GpuTime);
     tracyMemWrite(item->gpuTime.gpuTime, (int64_t)gpuStart);
     tracyMemWrite(item->gpuTime.queryId, uint16_t(queryId+0));
     tracyMemWrite(item->gpuTime.context, gpuContextId);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 
-    item = Profiler::QueueSerial();
-    tracyMemWrite(item->hdr.type, QueueType::GpuTime);
+    TracySerialPrepare(QueueType::GpuTime);
     tracyMemWrite(item->gpuTime.gpuTime, (int64_t)gpuEnd);
     tracyMemWrite(item->gpuTime.queryId, uint16_t(queryId+1));
     tracyMemWrite(item->gpuTime.context, gpuContextId);
-    Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 #define CUPTI_API_CALL(call) CUptiCallChecked(call, #call, __FILE__, __LINE__)
@@ -559,20 +551,11 @@ namespace tracy
             auto ptr = (char*)tracyMalloc(len);
             memcpy(ptr, name, len);
 
-            auto item = Profiler::QueueSerial();
-            tracyMemWrite(item->hdr.type, QueueType::GpuContextName);
+            TracySerialPrepare(QueueType::GpuContextName);
             tracyMemWrite(item->gpuContextNameFat.context, m_tracyGpuContext);
             tracyMemWrite(item->gpuContextNameFat.ptr, (uint64_t)ptr);
             tracyMemWrite(item->gpuContextNameFat.size, len);
-            SubmitQueueItem(item);
-        }
-
-        tracy_force_inline void SubmitQueueItem(tracy::QueueItem *item)
-        {
-#ifdef TRACY_ON_DEMAND
-            GetProfiler().DeferItem(*item);
-#endif
-            Profiler::QueueSerialFinish();
+            TracySerialDeferCommit;
         }
 
         static void QueryTimestamps(TracyTimestamp& tTracy, CUptiTimestamp& tCUpti) {
@@ -603,13 +586,12 @@ namespace tracy
             int64_t deltaTicksCUpti = tCUpti - prevCUptiTime;
             if (deltaTicksCUpti > 0) {
                 prevCUptiTime = tCUpti;
-                auto* item = Profiler::QueueSerial();
-                tracyMemWrite(item->hdr.type, QueueType::GpuCalibration);
+                TracySerialPrepare(QueueType::GpuCalibration);
                 tracyMemWrite(item->gpuCalibration.gpuTime, (int64_t)tCUpti);
                 tracyMemWrite(item->gpuCalibration.cpuTime, tTracy);
                 tracyMemWrite(item->gpuCalibration.cpuDelta, deltaTicksCUpti);
                 tracyMemWrite(item->gpuCalibration.context, m_tracyGpuContext);
-                Profiler::QueueSerialFinish();
+                TracySerialCommit;
             }
             #endif
             // NOTE(marcos): update linear regression incrementally, which will refine
@@ -1253,8 +1235,7 @@ namespace tracy
             QueryTimestamps(tTracy, tCUpti);
 
             // Announce to Tracy about a new GPU context/timeline:
-            auto item = Profiler::QueueSerial();
-            tracyMemWrite(item->hdr.type, QueueType::GpuNewContext);
+            TracySerialPrepare(QueueType::GpuNewContext);
             tracyMemWrite(item->gpuNewContext.cpuTime, tTracy);
             tracyMemWrite(item->gpuNewContext.gpuTime, (int64_t)tCUpti); // TODO: Be more careful about this cast
             tracyMemWrite(item->gpuNewContext.thread, (uint32_t)0);
@@ -1266,7 +1247,7 @@ namespace tracy
             #else
             tracyMemWrite(item->gpuNewContext.flags, tracy::GpuContextFlags(0));
             #endif
-            Profiler::QueueSerialFinish();
+            TracySerialCommit; // TODO should this defer?
 
             constexpr const char* tracyCtxName = "CUDA GPU/Device Activity";
             this->Name(tracyCtxName, uint16_t(strlen(tracyCtxName)));

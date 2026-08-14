@@ -3980,12 +3980,7 @@ void Profiler::ReportTopology()
         MemWrite( &item->cpuTopology.die, data.die );
         MemWrite( &item->cpuTopology.core, data.core );
         MemWrite( &item->cpuTopology.thread, data.thread );
-
-#ifdef TRACY_ON_DEMAND
-        DeferItem( *item );
-#endif
-
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     tracy_free( cpuData );
@@ -4044,12 +4039,7 @@ void Profiler::ReportTopology()
         MemWrite( &item->cpuTopology.die, data.die );
         MemWrite( &item->cpuTopology.core, data.core );
         MemWrite( &item->cpuTopology.thread, data.thread );
-
-#ifdef TRACY_ON_DEMAND
-        DeferItem( *item );
-#endif
-
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     tracy_free( cpuData );
@@ -4640,12 +4630,7 @@ TRACY_API void ___tracy_emit_gpu_new_context( ___tracy_gpu_new_context_data data
     tracy::MemWrite( &item->gpuNewContext.context, data.context );
     tracy::MemWrite( &item->gpuNewContext.flags, data.flags );
     tracy::MemWrite( &item->gpuNewContext.type, data.type );
-
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-
-    TracyLfqCommitC;
+    TracyLfqDeferCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_context_name( const struct ___tracy_gpu_context_name_data data )
@@ -4657,12 +4642,7 @@ TRACY_API void ___tracy_emit_gpu_context_name( const struct ___tracy_gpu_context
     tracy::MemWrite( &item->gpuContextNameFat.context, data.context );
     tracy::MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
     tracy::MemWrite( &item->gpuContextNameFat.size, data.len );
-
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-
-    TracyLfqCommitC;
+    TracyLfqDeferCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_calibration( const struct ___tracy_gpu_calibration_data data )
@@ -4686,77 +4666,70 @@ TRACY_API void ___tracy_emit_gpu_time_sync( const struct ___tracy_gpu_time_sync_
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_serial( const struct ___tracy_gpu_zone_begin_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneBeginSerial );
+    TracySerialPrepare( tracy::QueueType::GpuZoneBeginSerial );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_callstack_serial( const struct ___tracy_gpu_zone_begin_callstack_data data )
 {
-    auto item = tracy::Profiler::QueueSerialCallstack( tracy::Callstack( data.depth ) );
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneBeginCallstackSerial );
+    TracySerialPrepareCallstack( tracy::QueueType::GpuZoneBeginCallstackSerial, tracy::Callstack( data.depth ) );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc_serial( const struct ___tracy_gpu_zone_begin_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
+    TracySerialPrepare( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc_callstack_serial( const struct ___tracy_gpu_zone_begin_callstack_data data )
 {
-    auto item = tracy::Profiler::QueueSerialCallstack( tracy::Callstack( data.depth ) );
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneBeginAllocSrcLocCallstackSerial );
+    TracySerialPrepareCallstack( tracy::QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, tracy::Callstack( data.depth ) );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_time_serial( const struct ___tracy_gpu_time_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuTime );
+    TracySerialPrepare( tracy::QueueType::GpuTime );
     tracy::MemWrite( &item->gpuTime.gpuTime, data.gpuTime );
     tracy::MemWrite( &item->gpuTime.queryId, data.queryId );
     tracy::MemWrite( &item->gpuTime.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_zone_end_serial( const struct ___tracy_gpu_zone_end_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuZoneEndSerial );
+    TracySerialPrepare( tracy::QueueType::GpuZoneEndSerial );
     tracy::MemWrite( &item->gpuZoneEnd.cpuTime, tracy::Profiler::GetTime() );
     memset( &item->gpuZoneEnd.thread, 0, sizeof( item->gpuZoneEnd.thread ) );
     tracy::MemWrite( &item->gpuZoneEnd.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneEnd.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_new_context_serial( ___tracy_gpu_new_context_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuNewContext );
+    TracyLfqPrepareC( tracy::QueueType::GpuNewContext );
     tracy::MemWrite( &item->gpuNewContext.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuNewContext.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->gpuNewContext.gpuTime, data.gpuTime );
@@ -4764,12 +4737,7 @@ TRACY_API void ___tracy_emit_gpu_new_context_serial( ___tracy_gpu_new_context_da
     tracy::MemWrite( &item->gpuNewContext.context, data.context );
     tracy::MemWrite( &item->gpuNewContext.flags, data.flags );
     tracy::MemWrite( &item->gpuNewContext.type, data.type );
-
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-
-    tracy::Profiler::QueueSerialFinish();
+    TracyLfqDeferCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_context_name_serial( const struct ___tracy_gpu_context_name_data data )
@@ -4777,38 +4745,30 @@ TRACY_API void ___tracy_emit_gpu_context_name_serial( const struct ___tracy_gpu_
     auto ptr = (char*)tracy::tracy_malloc( data.len );
     memcpy( ptr, data.name, data.len );
 
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuContextName );
+    TracySerialPrepare( tracy::QueueType::GpuContextName );
     tracy::MemWrite( &item->gpuContextNameFat.context, data.context );
     tracy::MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
     tracy::MemWrite( &item->gpuContextNameFat.size, data.len );
-
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialDeferCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_calibration_serial( const struct ___tracy_gpu_calibration_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuCalibration );
+    TracySerialPrepare( tracy::QueueType::GpuCalibration );
     tracy::MemWrite( &item->gpuCalibration.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuCalibration.gpuTime, data.gpuTime );
     tracy::MemWrite( &item->gpuCalibration.cpuDelta, data.cpuDelta );
     tracy::MemWrite( &item->gpuCalibration.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_emit_gpu_time_sync_serial( const struct ___tracy_gpu_time_sync_data data )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::GpuTimeSync );
+    TracySerialPrepare( tracy::QueueType::GpuTimeSync );
     tracy::MemWrite( &item->gpuTimeSync.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuTimeSync.gpuTime, data.gpuTime );
     tracy::MemWrite( &item->gpuTimeSync.context, data.context );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 struct __tracy_lockable_context_data
@@ -4830,30 +4790,22 @@ TRACY_API struct __tracy_lockable_context_data* ___tracy_announce_lockable_ctx( 
 #endif
     assert( lockdata->m_id != (std::numeric_limits<uint32_t>::max)() );
 
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockAnnounce );
+    TracySerialPrepare( tracy::QueueType::LockAnnounce );
     tracy::MemWrite( &item->lockAnnounce.id, lockdata->m_id );
     tracy::MemWrite( &item->lockAnnounce.time, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->lockAnnounce.lckloc, (uint64_t)srcloc );
     tracy::MemWrite( &item->lockAnnounce.type, tracy::LockType::Lockable );
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialDeferCommit;
 
     return lockdata;
 }
 
 TRACY_API void ___tracy_terminate_lockable_ctx( struct __tracy_lockable_context_data* lockdata )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockTerminate );
+    TracySerialPrepare( tracy::QueueType::LockTerminate );
     tracy::MemWrite( &item->lockTerminate.id, lockdata->m_id );
     tracy::MemWrite( &item->lockTerminate.time, tracy::Profiler::GetTime() );
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialDeferCommit;
 
 #ifdef TRACY_ON_DEMAND
     lockdata->m_lockCount.~atomic();
@@ -4877,23 +4829,21 @@ TRACY_API int32_t ___tracy_before_lock_lockable_ctx( struct __tracy_lockable_con
     if( !queue ) return static_cast<int32_t>(false);
 #endif
 
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockWait );
+    TracySerialPrepare( tracy::QueueType::LockWait );
     tracy::MemWrite( &item->lockWait.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->lockWait.id, lockdata->m_id );
     tracy::MemWrite( &item->lockWait.time, tracy::Profiler::GetTime() );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
     return static_cast<int32_t>(true);
 }
 
 TRACY_API void ___tracy_after_lock_lockable_ctx( struct __tracy_lockable_context_data* lockdata )
 {
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockObtain );
+    TracySerialPrepare( tracy::QueueType::LockObtain );
     tracy::MemWrite( &item->lockObtain.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->lockObtain.id, lockdata->m_id );
     tracy::MemWrite( &item->lockObtain.time, tracy::Profiler::GetTime() );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_after_unlock_lockable_ctx( struct __tracy_lockable_context_data* lockdata )
@@ -4908,11 +4858,10 @@ TRACY_API void ___tracy_after_unlock_lockable_ctx( struct __tracy_lockable_conte
     }
 #endif
 
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockRelease );
+    TracySerialPrepare( tracy::QueueType::LockRelease );
     tracy::MemWrite( &item->lockRelease.id, lockdata->m_id );
     tracy::MemWrite( &item->lockRelease.time, tracy::Profiler::GetTime() );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_after_try_lock_lockable_ctx( struct __tracy_lockable_context_data* lockdata, int32_t acquired )
@@ -4934,12 +4883,11 @@ TRACY_API void ___tracy_after_try_lock_lockable_ctx( struct __tracy_lockable_con
 
     if( acquired )
     {
-        auto item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockObtain );
+        TracySerialPrepare( tracy::QueueType::LockObtain );
         tracy::MemWrite( &item->lockObtain.thread, tracy::GetThreadHandle() );
         tracy::MemWrite( &item->lockObtain.id, lockdata->m_id );
         tracy::MemWrite( &item->lockObtain.time, tracy::Profiler::GetTime() );
-        tracy::Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 }
 
@@ -4956,12 +4904,11 @@ TRACY_API void ___tracy_mark_lockable_ctx( struct __tracy_lockable_context_data*
     }
 #endif
 
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockMark );
+    TracySerialPrepare( tracy::QueueType::LockMark );
     tracy::MemWrite( &item->lockMark.thread, tracy::GetThreadHandle() );
     tracy::MemWrite( &item->lockMark.id, lockdata->m_id );
     tracy::MemWrite( &item->lockMark.srcloc, (uint64_t)srcloc );
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
 }
 
 TRACY_API void ___tracy_custom_name_lockable_ctx( struct __tracy_lockable_context_data* lockdata, const char* name, size_t nameSz )
@@ -4969,15 +4916,11 @@ TRACY_API void ___tracy_custom_name_lockable_ctx( struct __tracy_lockable_contex
     assert( nameSz < (std::numeric_limits<uint16_t>::max)() );
     auto ptr = (char*)tracy::tracy_malloc( nameSz );
     memcpy( ptr, name, nameSz );
-    auto item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite( &item->hdr.type, tracy::QueueType::LockName );
+    TracySerialPrepare( tracy::QueueType::LockName );
     tracy::MemWrite( &item->lockNameFat.id, lockdata->m_id );
     tracy::MemWrite( &item->lockNameFat.name, (uint64_t)ptr );
     tracy::MemWrite( &item->lockNameFat.size, (uint16_t)nameSz );
-#ifdef TRACY_ON_DEMAND
-    tracy::GetProfiler().DeferItem( *item );
-#endif
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialDeferCommit;
 }
 
 TRACY_API int32_t ___tracy_connected( void )

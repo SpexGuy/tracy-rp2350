@@ -131,35 +131,59 @@ struct LuaZoneState
 #define TracyLfqCommit \
     __tail.store( __magic + 1, std::memory_order_release );
 
-#define TracyLfqPrepareC( _type ) \
-    tracy::moodycamel::ConcurrentQueueDefaultTraits::index_t __magic; \
-    auto __token = tracy::GetToken(); \
-    auto& __tail = __token->get_tail_index(); \
-    auto item = __token->enqueue_begin( __magic ); \
-    tracy::MemWrite( &item->hdr.type, _type );
 
-#define TracyLfqCommitC \
-    __tail.store( __magic + 1, std::memory_order_release );
+#define TracyLfqPrepareC( _type ) TracyLfqPrepare( _type )
+#define TracyLfqCommitC TracyLfqCommit
+
+
+#define TracySerialPrepare( _type ) \
+    auto item = tracy::Profiler::QueueSerial(); \
+    tracy::MemWrite( &item->hdr.type, _type );
+#define TracySerialPrepareCallstack( _type, _callstack ) \
+    auto item = tracy::Profiler::QueueSerialCallstack( _callstack ); \
+    tracy::MemWrite( &item->hdr.type, _type );
+#define TracySerialCommit \
+    tracy::Profiler::QueueSerialFinish();
+
+
+#ifdef TRACY_ON_DEMAND
+#  define _TracyDefer tracy::GetProfiler().DeferItem(*item);
+#else
+#  define _TracyDefer
+#endif
+
+#define TracyLfqDeferCommit \
+    _TracyDefer; \
+    TracyLfqCommit;
+
+#define TracySerialDeferCommit \
+    _TracyDefer; \
+    TracySerialCommit;
+
+#define TracyQueueDeferCommit \
+    _TracyDefer; \
+    TracyQueueCommit;
 
 
 #ifdef TRACY_FIBERS
-#  define TracyQueuePrepare( _type ) \
-    auto item = tracy::Profiler::QueueSerial(); \
-    tracy::MemWrite( &item->hdr.type, _type );
+
+#  define TracyQueuePrepare( _type ) TracySerialPrepare( _type )
 #  define TracyQueueCommit( _name ) \
     tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
-    tracy::Profiler::QueueSerialFinish();
-#  define TracyQueuePrepareC( _type ) \
-    auto item = tracy::Profiler::QueueSerial(); \
-    tracy::MemWrite( &item->hdr.type, _type );
+    TracySerialCommit;
+
+#  define TracyQueuePrepareC( _type ) TracySerialPrepare( _type )
 #  define TracyQueueCommitC( _name ) \
     tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
-    tracy::Profiler::QueueSerialFinish();
+    TracySerialCommit;
+
 #else
+
 #  define TracyQueuePrepare( _type ) TracyLfqPrepare( _type )
 #  define TracyQueueCommit( _name ) TracyLfqCommit
 #  define TracyQueuePrepareC( _type ) TracyLfqPrepareC( _type )
 #  define TracyQueueCommitC( _name ) TracyLfqCommitC
+
 #endif
 
 
@@ -296,11 +320,10 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() ) return;
 #endif
-        auto item = QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::FrameMarkMsg );
+        TracySerialPrepare( QueueType::FrameMarkMsg );
         MemWrite( &item->frameMark.time, GetTime() );
         MemWrite( &item->frameMark.name, uint64_t( name ) );
-        QueueSerialFinish();
+        TracySerialCommit;
     }
 
     static tracy_force_inline void SendFrameMark( const char* name, QueueType type )
@@ -309,11 +332,10 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() ) return;
 #endif
-        auto item = QueueSerial();
-        MemWrite( &item->hdr.type, type );
+        TracySerialPrepare( type );
         MemWrite( &item->frameMark.time, GetTime() );
         MemWrite( &item->frameMark.name, uint64_t( name ) );
-        QueueSerialFinish();
+        TracySerialCommit;
     }
 
     static tracy_force_inline void SendFrameImage( const void* image, uint16_t w, uint16_t h, uint8_t offset, bool flip )
@@ -390,12 +412,7 @@ public:
         MemWrite( &item->plotConfig.step, (uint8_t)step );
         MemWrite( &item->plotConfig.fill, (uint8_t)fill );
         MemWrite( &item->plotConfig.color, color );
-
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     static tracy_force_inline void Message( const char* txt, size_t size, int32_t callstack_depth )
@@ -487,12 +504,7 @@ public:
         MemWrite( &item->messageFat.time, GetTime() );
         MemWrite( &item->messageFat.text, (uint64_t)ptr );
         MemWrite( &item->messageFat.size, (uint16_t)size );
-
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     static tracy_force_inline void MemAlloc( const void* ptr, size_t size, bool secure )
@@ -713,12 +725,7 @@ public:
         tracy::MemWrite( &item->paramSetup.name, (uint64_t)name );
         tracy::MemWrite( &item->paramSetup.isBool, (uint8_t)isBool );
         tracy::MemWrite( &item->paramSetup.val, val );
-
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     static tracy_force_inline void SourceCallbackRegister( SourceContentsCallback cb, void* data )

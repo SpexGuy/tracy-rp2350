@@ -236,15 +236,11 @@ public:
         auto ptr = (char*)tracy_malloc( len );
         memcpy( ptr, name, len );
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuContextName );
+        TracySerialPrepare( QueueType::GpuContextName );
         MemWrite( &item->gpuContextNameFat.context, m_context );
         MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
         MemWrite( &item->gpuContextNameFat.size, len );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
     void Collect( VkCommandBuffer cmdbuf )
@@ -301,12 +297,11 @@ public:
                 break;
             }
 
-            auto item = Profiler::QueueSerial();
-            MemWrite( &item->hdr.type, QueueType::GpuTime );
+            TracySerialPrepare( QueueType::GpuTime );
             MemWrite( &item->gpuTime.gpuTime, m_res[idx * 2] );
             MemWrite( &item->gpuTime.queryId, uint16_t( wrappedTail + idx ) );
             MemWrite( &item->gpuTime.context, m_context );
-            Profiler::QueueSerialFinish();
+            TracySerialCommit;
         }
 
         if( m_timeDomain != VK_TIME_DOMAIN_DEVICE_EXT )
@@ -318,13 +313,12 @@ public:
             if( delta > 0 )
             {
                 m_prevCalibration = tcpu;
-                auto item = Profiler::QueueSerial();
-                MemWrite( &item->hdr.type, QueueType::GpuCalibration );
+                TracySerialPrepare( QueueType::GpuCalibration );
                 MemWrite( &item->gpuCalibration.gpuTime, tgpu );
                 MemWrite( &item->gpuCalibration.cpuTime, refCpu );
                 MemWrite( &item->gpuCalibration.cpuDelta, delta );
                 MemWrite( &item->gpuCalibration.context, m_context );
-                Profiler::QueueSerialFinish();
+                TracySerialCommit;
             }
         }
 
@@ -447,8 +441,7 @@ private:
         VK_FUNCTION_WRAPPER( vkGetPhysicalDeviceProperties( physdev, &prop ) );
         const float period = prop.limits.timestampPeriod;
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuNewContext );
+        TracySerialPrepare( QueueType::GpuNewContext );
         MemWrite( &item->gpuNewContext.cpuTime, tcpu );
         MemWrite( &item->gpuNewContext.gpuTime, tgpu );
         memset( &item->gpuNewContext.thread, 0, sizeof( item->gpuNewContext.thread ) );
@@ -456,11 +449,7 @@ private:
         MemWrite( &item->gpuNewContext.context, m_context );
         MemWrite( &item->gpuNewContext.flags, flags );
         MemWrite( &item->gpuNewContext.type, GpuContextType::Vulkan );
-
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        Profiler::QueueSerialFinish();
+        TracySerialDeferCommit;
     }
 
 #if defined TRACY_VK_USE_SYMBOL_TABLE
@@ -526,14 +515,13 @@ public:
         const auto queryId = ctx->NextQueryId();
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->m_query, queryId ) );
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuZoneBeginSerial );
+        TracySerialPrepare( QueueType::GpuZoneBeginSerial );
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, ctx->GetId() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline VkCtxScope( VkCtx* ctx, const SourceLocationData* srcloc, VkCommandBuffer cmdbuf, int32_t depth, bool is_active )
@@ -584,14 +572,13 @@ public:
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->m_query, queryId ) );
 
         const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuZoneBeginAllocSrcLocSerial );
+        TracySerialPrepare( QueueType::GpuZoneBeginAllocSrcLocSerial );
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, ctx->GetId() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
     tracy_force_inline VkCtxScope( VkCtx* ctx, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, VkCommandBuffer cmdbuf, int32_t depth, bool is_active )
@@ -635,13 +622,12 @@ public:
         const auto queryId = m_ctx->NextQueryId();
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( m_cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_ctx->m_query, queryId ) );
 
-        auto item = Profiler::QueueSerial();
-        MemWrite( &item->hdr.type, QueueType::GpuZoneEndSerial );
+        TracySerialPrepare( QueueType::GpuZoneEndSerial );
         MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneEnd.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, m_ctx->GetId() );
-        Profiler::QueueSerialFinish();
+        TracySerialCommit;
     }
 
 private:

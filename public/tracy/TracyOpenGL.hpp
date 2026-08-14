@@ -116,12 +116,7 @@ public:
         MemWrite( &item->gpuNewContext.context, m_context );
         MemWrite( &item->gpuNewContext.flags, uint8_t( 0 ) );
         MemWrite( &item->gpuNewContext.type, GpuContextType::OpenGl );
-
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     void Name( const char* name, uint16_t len )
@@ -133,10 +128,7 @@ public:
         MemWrite( &item->gpuContextNameFat.context, m_context );
         MemWrite( &item->gpuContextNameFat.ptr, (uint64_t)ptr );
         MemWrite( &item->gpuContextNameFat.size, len );
-#ifdef TRACY_ON_DEMAND
-        GetProfiler().DeferItem( *item );
-#endif
-        TracyLfqCommit;
+        TracyLfqDeferCommit;
     }
 
     void Collect()
