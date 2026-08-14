@@ -3643,10 +3643,11 @@ bool Profiler::HandleServerQuery()
                 SendString( ptr, t->name, QueueType::ThreadName );
                 if( t->groupHint != 0 )
                 {
-                    TracyLfqPrepare( QueueType::ThreadGroupHint );
-                    MemWrite( &item->threadGroupHint.thread, (uint32_t)ptr );
-                    MemWrite( &item->threadGroupHint.groupHint, t->groupHint );
-                    TracyLfqCommit;
+                    QueueItem item;
+                    MemWrite( &item.hdr.type, QueueType::ThreadGroupHint );
+                    MemWrite( &item.threadGroupHint.thread, (uint32_t)ptr );
+                    MemWrite( &item.threadGroupHint.groupHint, t->groupHint );
+                    AppendData( &item, QueueDataSize[(int)QueueType::ThreadGroupHint] );
                 }
             }
             else
@@ -4096,10 +4097,11 @@ void Profiler::ProcessSysTime()
         {
             m_sysTimeLast = t;
 
-            TracyLfqPrepare( QueueType::SysTimeReport );
-            MemWrite( &item->sysTime.time, GetTime() );
-            MemWrite( &item->sysTime.sysTime, sysTime );
-            TracyLfqCommit;
+            QueueItem item;
+            MemWrite( &item.hdr.type, QueueType::SysTimeReport );
+            MemWrite( &item.sysTime.time, GetTime() );
+            MemWrite( &item.sysTime.sysTime, sysTime );
+            AppendData( &item, QueueDataSize[(int)QueueType::SysTimeReport] );
         }
     }
 }

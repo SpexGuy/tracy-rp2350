@@ -56,11 +56,12 @@ void SysPower::Tick()
                 }
                 v.value = p;
 
-                TracyLfqPrepare( QueueType::SysPowerReport );
-                MemWrite( &item->sysPower.time, Profiler::GetTime() );
-                MemWrite( &item->sysPower.delta, delta );
-                MemWrite( &item->sysPower.name, (uint64_t)v.name );
-                TracyLfqCommit;
+                QueueItem item;
+                MemWrite( &item.hdr.type, QueueType::SysPowerReport );
+                MemWrite( &item.sysPower.time, Profiler::GetTime() );
+                MemWrite( &item.sysPower.delta, delta );
+                MemWrite( &item.sysPower.name, (uint64_t)v.name );
+                AppendData( &item, QueueDataSize[(int)QueueType::SysPowerReport] );
             }
         }
     }
