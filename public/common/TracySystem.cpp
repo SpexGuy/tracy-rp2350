@@ -9,6 +9,8 @@
 #    define NOMINMAX
 #  endif
 #  include <windows.h>
+#  define SECURITY_WIN32
+#  include <secext.h>
 #  include <malloc.h>
 #  include "TracyWinFamily.hpp"
 #else
@@ -350,6 +352,11 @@ TRACY_API const char* GetUserLogin()
 #  if defined TRACY_WIN32_NO_DESKTOP
     return "(?)";
 #  else
+    // Patch for MinGW / zig cc
+    #ifndef UNLEN
+    #  define UNLEN 256
+    #endif
+
     DWORD userSz = UNLEN+1;
     static char user[UNLEN+1];
     GetUserNameA( user, &userSz );
