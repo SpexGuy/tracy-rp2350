@@ -166,6 +166,7 @@ struct LuaZoneState
 
 #define TracySerialBegin \
     tracy::QueueItem* item = nullptr;
+#define TracySerialUseThreadContext
 #define TracySerialSingleString( _ptr, _len ) \
     assert( _len < std::numeric_limits<uint16_t>::max() ); \
     auto __ptr2 = (char*)tracy::tracy_malloc( _len ); \
@@ -212,25 +213,28 @@ struct LuaZoneState
 #ifdef TRACY_FIBERS
 
 #  define TracyQueueBegin \
-    TracySerialBegin;
+    TracySerialBegin; \
+    TracySerialUseThreadContext;
 #  define TracyQueueSingleString( _ptr, _len ) TracySerialSingleString( _ptr, _len )
 #  define TracyQueueSingleStringLenNT( _ptr, _len ) TracySerialSingleStringLenNT( _ptr, _len )
 #  define TracyQueueSrcLoc( _srcloc ) TracySerialSrcLoc( _srcloc )
 #  define TracyQueueSrcLocUnfilled( _srcloc, _size ) TracySerialSrcLocUnfilled( _srcloc, _size )
 #  define TracyQueueItem( _type ) TracySerialItem( _type )
 #  define TracyQueueFat( _ptr, _value ) TracySerialFat( _ptr, _value )
+#  define TracyQueueThreadCtx( _name ) TracySerialFat( &item->_name.thread, tracy::GetThreadHandle() )
 #  define TracyQueueCommit( _name ) \
-    tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
+    TracyQueueThreadCtx( _name ); \
     TracySerialCommit;
 
 #  define TracyQueueBeginC \
-    TracySerialBegin;
+    TracySerialBegin; \
+    TracySerialUseThreadContext;
 #  define TracyQueueSingleStringC( _ptr, _len ) TracySerialSingleString( _ptr, _len )
 #  define TracyQueueSrcLocC( _srcloc ) TracySerialSrcLoc( _srcloc )
 #  define TracyQueueItemC( _type ) TracySerialItem( _type )
 #  define TracyQueueFatC( _ptr, _value ) TracySerialFat( _ptr, _value )
 #  define TracyQueueCommitC( _name ) \
-    tracy::MemWrite( &item->_name.thread, tracy::GetThreadHandle() ); \
+    TracyQueueThreadCtx( _name ); \
     TracySerialCommit;
 
 #else
@@ -242,6 +246,7 @@ struct LuaZoneState
 #  define TracyQueueSrcLocUnfilled( _srcloc, _size ) TracyLfqSrcLocUnfilled( _srcloc, _size )
 #  define TracyQueueItem( _type ) TracyLfqItem( _type )
 #  define TracyQueueFat( _ptr, _value ) TracyLfqFat( _ptr, _value )
+#  define TracyQueueThreadCtx( _name )
 #  define TracyQueueCommit( _name ) TracyLfqCommit
 #  define TracyQueueBeginC TracyLfqBeginC
 #  define TracyQueueSingleStringC( _ptr, _len ) TracyLfqSingleStringC( _ptr, _len )
@@ -284,7 +289,7 @@ struct LuaZoneState
 // Despite being potentially serial, TracyQueue always uses QueueType::Callstack
 #define TracyQueueCallstack \
     _TracySubmitCallstack( TracyQueueItem, TracyQueueFat, tracy::QueueType::Callstack ); \
-    tracy::MemWrite( &item->callstackFatThread.thread, tracy::GetThreadHandle() );
+    TracyQueueThreadCtx( callstackFatThread );
 
 #define TracySerialPrepCallstack( _depth, _type_var, _base_type, _callstack_type ) _TracyPrepCallstack( _depth, _type_var, _base_type, _callstack_type )
 #define TracySerialPrepCutCallstack( _depth, _cut, _type_var, _base_type, _callstack_type ) _TracyPrepCutCallstack( _depth, _cut, _type_var, _base_type, _callstack_type )
