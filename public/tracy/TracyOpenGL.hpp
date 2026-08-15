@@ -154,7 +154,7 @@ public:
             glGetQueryObjectui64v( m_query[m_tail], GL_QUERY_RESULT, &time );
 
             TracyLfqPrepare( QueueType::GpuTime );
-            MemWrite( &item->gpuTime.gpuTime, (int64_t)time );
+            TracyLfqGpuTime( &item->gpuTime.gpuTime, (int64_t)time );
             MemWrite( &item->gpuTime.queryId, (uint16_t)m_tail );
             MemWrite( &item->gpuTime.context, m_context );
             TracyLfqCommit;
@@ -205,7 +205,7 @@ public:
         glQueryCounter( GetGpuCtx().ptr->TranslateOpenGlQueryId( queryId ), GL_TIMESTAMP );
 
         TracyLfqPrepare( QueueType::GpuZoneBegin );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracyLfqThreadTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         memset( &item->gpuZoneBegin.thread, 0, sizeof( item->gpuZoneBegin.thread ) );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, GetGpuCtx().ptr->GetId() );
@@ -236,7 +236,7 @@ public:
         TracyLfqItem( type );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
 #endif
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracyLfqThreadTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, GetGpuCtx().ptr->GetId() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
@@ -261,7 +261,7 @@ public:
         TracyLfqSrcLocUnfilled( srcloc, srcloc_len );
         Profiler::FillSourceLocation( srcloc, srcloc_len, line, source, sourceSz, function, functionSz, name, nameSz );
         TracyLfqItem( QueueType::GpuZoneBeginAllocSrcLoc );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracyLfqThreadTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         memset( &item->gpuZoneBegin.thread, 0, sizeof( item->gpuZoneBegin.thread ) );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, GetGpuCtx().ptr->GetId() );
@@ -300,7 +300,7 @@ public:
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
 #endif
         const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracyLfqThreadTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, GetGpuCtx().ptr->GetId() );
         TracyLfqFat( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
@@ -315,7 +315,7 @@ public:
         glQueryCounter( GetGpuCtx().ptr->TranslateOpenGlQueryId( queryId ), GL_TIMESTAMP );
 
         TracyLfqPrepare( QueueType::GpuZoneEnd );
-        MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
+        TracyLfqThreadTime( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         memset( &item->gpuZoneEnd.thread, 0, sizeof( item->gpuZoneEnd.thread ) );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, GetGpuCtx().ptr->GetId() );

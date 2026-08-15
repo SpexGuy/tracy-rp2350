@@ -291,7 +291,7 @@ namespace tracy
                     const auto queryId = counter;
 
                     TracySerialPrepare(QueueType::GpuTime);
-                    MemWrite(&item->gpuTime.gpuTime, timestamp);
+                    TracySerialGpuTime(&item->gpuTime.gpuTime, timestamp);
                     MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(queryId));
                     MemWrite(&item->gpuTime.context, GetId());
                     TracySerialCommit;
@@ -336,7 +336,7 @@ namespace tracy
 
         tracy_force_inline void WriteQueueItemAlloc(QueueItem* item, uint64_t srcLocation)
         {
-            MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
+            TracySerialTime(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             TracySerialFat(&item->gpuZoneBegin.srcloc, srcLocation);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, static_cast<uint16_t>(m_queryId));
@@ -345,7 +345,7 @@ namespace tracy
 
         tracy_force_inline void WriteQueueItemStatic(QueueItem* item, uint64_t srcLocation)
         {
-            MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
+            TracySerialTime(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneBegin.srcloc, srcLocation);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, static_cast<uint16_t>(m_queryId));
@@ -434,7 +434,7 @@ namespace tracy
             m_cmdList->EndQuery(m_ctx->m_queryHeap, D3D12_QUERY_TYPE_TIMESTAMP, queryId);
 
             TracySerialPrepare( QueueType::GpuZoneEndSerial );
-            MemWrite(&item->gpuZoneEnd.cpuTime, Profiler::GetTime());
+            TracySerialTime(&item->gpuZoneEnd.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneEnd.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneEnd.queryId, static_cast<uint16_t>(queryId));
             MemWrite(&item->gpuZoneEnd.context, m_ctx->GetId());

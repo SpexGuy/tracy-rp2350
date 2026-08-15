@@ -169,7 +169,7 @@ void WINAPI EventRecordCallback( PEVENT_RECORD record )
             const auto cswitch = (const CSwitch*)record->UserData;
 
             TracyLfqPrepare( QueueType::ContextSwitch );
-            MemWrite( &item->contextSwitch.time, hdr.TimeStamp.QuadPart );
+            TracyLfqCtxTime( &item->contextSwitch.time, hdr.TimeStamp.QuadPart );
             MemWrite( &item->contextSwitch.oldThread, cswitch->oldThreadId );
             MemWrite( &item->contextSwitch.newThread, cswitch->newThreadId );
             MemWrite( &item->contextSwitch.cpu, record->BufferContext.ProcessorNumber );
@@ -185,7 +185,7 @@ void WINAPI EventRecordCallback( PEVENT_RECORD record )
             const auto rt = (const ReadyThread*)record->UserData;
 
             TracyLfqPrepare( QueueType::ThreadWakeup );
-            MemWrite( &item->threadWakeup.time, hdr.TimeStamp.QuadPart );
+            TracyLfqCtxTime( &item->threadWakeup.time, hdr.TimeStamp.QuadPart );
             MemWrite( &item->threadWakeup.cpu, record->BufferContext.ProcessorNumber );
             MemWrite( &item->threadWakeup.thread, rt->threadId );
             MemWrite( &item->threadWakeup.adjustReason, rt->adjustReason );
@@ -1502,7 +1502,7 @@ void SysTraceWorker( void* ptr )
                             else                           oldThreadState = 103;
 
                             TracyLfqPrepare( QueueType::ContextSwitch );
-                            MemWrite( &item->contextSwitch.time, t0 );
+                            TracyLfqCtxTime( &item->contextSwitch.time, t0 );
                             MemWrite( &item->contextSwitch.oldThread, prev_pid );
                             MemWrite( &item->contextSwitch.newThread, next_pid );
                             MemWrite( &item->contextSwitch.cpu, uint8_t( ring.GetCpu() ) );
@@ -1543,7 +1543,7 @@ void SysTraceWorker( void* ptr )
                             ring.Read( &pid, offset, sizeof( uint32_t ) );
                             
                             TracyLfqPrepare( QueueType::ThreadWakeup );
-                            MemWrite( &item->threadWakeup.time, t0 );
+                            TracyLfqCtxTime( &item->threadWakeup.time, t0 );
                             MemWrite( &item->threadWakeup.thread, pid );
                             MemWrite( &item->threadWakeup.cpu, (uint8_t)ring.GetCpu() );
 

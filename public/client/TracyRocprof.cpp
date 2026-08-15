@@ -178,7 +178,7 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
             TracySerialBegin;
             TracySerialSrcLoc( src_loc );
             TracySerialItem( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
-            tracy::MemWrite( &item->gpuZoneBegin.cpuTime, cpu_start_time );
+            TracySerialTime( &item->gpuZoneBegin.cpuTime, cpu_start_time );
             TracySerialFat( &item->gpuZoneBegin.srcloc, (uint64_t)src_loc );
             tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
             tracy::MemWrite( &item->gpuZoneBegin.queryId, query_id );
@@ -191,7 +191,7 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
         static const ___tracy_source_location_data src_loc = { NULL, NULL, NULL, 0, 0 };
         {
             TracySerialPrepare( tracy::QueueType::GpuZoneBeginSerial );
-            tracy::MemWrite( &item->gpuZoneBegin.cpuTime, cpu_start_time );
+            TracySerialTime( &item->gpuZoneBegin.cpuTime, cpu_start_time );
             tracy::MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)&src_loc );
             tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
             tracy::MemWrite( &item->gpuZoneBegin.queryId, query_id );
@@ -202,7 +202,7 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
 
     {
         TracySerialPrepare( tracy::QueueType::GpuTime );
-        tracy::MemWrite( &item->gpuTime.gpuTime, start_timestamp );
+        TracySerialGpuTime( &item->gpuTime.gpuTime, start_timestamp );
         tracy::MemWrite( &item->gpuTime.queryId, query_id );
         tracy::MemWrite( &item->gpuTime.context, context_id );
         TracySerialCommit;
@@ -210,7 +210,7 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
 
     {
         TracySerialPrepare( tracy::QueueType::GpuZoneEndSerial );
-        tracy::MemWrite( &item->gpuZoneEnd.cpuTime, cpu_end_time );
+        TracySerialTime( &item->gpuZoneEnd.cpuTime, cpu_end_time );
         tracy::MemWrite( &item->gpuZoneEnd.thread, tracy::GetThreadHandle() );
         tracy::MemWrite( &item->gpuZoneEnd.queryId, query_id );
         tracy::MemWrite( &item->gpuZoneEnd.context, context_id );
@@ -219,7 +219,7 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
 
     {
         TracySerialPrepare( tracy::QueueType::GpuTime );
-        tracy::MemWrite( &item->gpuTime.gpuTime, end_timestamp );
+        TracySerialGpuTime( &item->gpuTime.gpuTime, end_timestamp );
         tracy::MemWrite( &item->gpuTime.queryId, query_id );
         tracy::MemWrite( &item->gpuTime.context, context_id );
         TracySerialCommit;

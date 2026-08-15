@@ -133,7 +133,7 @@ void tracyFree(void* ptr) {
 void tracyZoneBegin(TracyTimestamp time, tracy::SourceLocationData* srcLoc) {
     using namespace tracy;
     TracyQueuePrepare(QueueType::ZoneBegin);
-    tracyMemWrite(item->zoneBegin.time, time);
+    TracyQueueThreadTime( &item->zoneBegin.time, time );
     tracyMemWrite(item->zoneBegin.srcloc, (uint64_t)srcLoc);
     TracyQueueCommit(zoneBeginThread);
 }
@@ -141,7 +141,7 @@ void tracyZoneBegin(TracyTimestamp time, tracy::SourceLocationData* srcLoc) {
 void tracyZoneEnd(TracyTimestamp time) {
     using namespace tracy;
     TracyQueuePrepare(QueueType::ZoneEnd);
-    tracyMemWrite(item->zoneEnd.time, time);
+    TracyQueueThreadTime( &item->zoneEnd.time, time );
     TracyQueueCommit(zoneEndThread);
 }
 
@@ -149,7 +149,7 @@ void tracyPlot(const char* name, float value, TracyTimestamp time) {
     using namespace tracy;
     TracyLfqPrepare(QueueType::PlotDataFloat);
     tracyMemWrite(item->plotDataFloat.name, (uint64_t)name);
-    tracyMemWrite(item->plotDataFloat.time, time);
+    TracyLfqThreadTime( &item->plotDataFloat.time, time );
     tracyMemWrite(item->plotDataFloat.val, value);
     TracyLfqCommit;
 }
@@ -186,7 +186,7 @@ void tracyEmitMemAlloc(const char* name, const void* ptr, size_t size, TracyTime
     TracySerialBegin;
     TracySerialMemName( name );
     TracySerialItem( QueueType::MemAllocNamed );
-    tracyMemWrite(item->memAlloc.time, time);
+    TracySerialTime( &item->memAlloc.time, time );
     tracyMemWrite(item->memAlloc.thread, thread);
     tracyMemWrite(item->memAlloc.ptr, (uint64_t)ptr);
     Profiler::SetMemAllocSize( item, size );
@@ -200,7 +200,7 @@ void tracyEmitMemFree(const char* name, const void* ptr, TracyTimestamp time) {
     TracySerialBegin;
     TracySerialMemName( name );
     TracySerialItem( QueueType::MemFreeNamed );
-    tracyMemWrite(item->memFree.time, time);
+    TracySerialTime( item->memFree.time, time );
     tracyMemWrite(item->memFree.thread, thread);
     tracyMemWrite(item->memFree.ptr, (uint64_t)ptr);
     TracySerialCommit;
@@ -222,14 +222,14 @@ void tracyAnnounceGpuTimestamp(TracyTimestamp apiStart, TracyTimestamp apiEnd,
     TracySerialBegin;
 
     TracySerialItem(QueueType::GpuZoneBeginSerial);
-    tracyMemWrite(item->gpuZoneBegin.cpuTime, apiStart);
+    TracySerialTime(item->gpuZoneBegin.cpuTime, apiStart);
     tracyMemWrite(item->gpuZoneBegin.srcloc, (uint64_t)sourceLocation);
     tracyMemWrite(item->gpuZoneBegin.thread, threadId);
     tracyMemWrite(item->gpuZoneBegin.queryId, uint16_t(queryId+0));
     tracyMemWrite(item->gpuZoneBegin.context, gpuContextId);
 
     TracySerialItem(QueueType::GpuZoneEndSerial);
-    tracyMemWrite(item->gpuZoneEnd.cpuTime, apiEnd);
+    TracySerialTime(item->gpuZoneEnd.cpuTime, apiEnd);
     tracyMemWrite(item->gpuZoneEnd.thread, threadId);
     tracyMemWrite(item->gpuZoneEnd.queryId, uint16_t(queryId+1));
     tracyMemWrite(item->gpuZoneEnd.context, gpuContextId);
@@ -244,12 +244,12 @@ void tracySubmitGpuTimestamp(CUptiTimestamp gpuStart, CUptiTimestamp gpuEnd,
     TracySerialBegin;
 
     TracySerialItem(QueueType::GpuTime);
-    tracyMemWrite(item->gpuTime.gpuTime, (int64_t)gpuStart);
+    TracySerialGpuTime(item->gpuTime.gpuTime, (int64_t)gpuStart);
     tracyMemWrite(item->gpuTime.queryId, uint16_t(queryId+0));
     tracyMemWrite(item->gpuTime.context, gpuContextId);
 
     TracySerialItem(QueueType::GpuTime);
-    tracyMemWrite(item->gpuTime.gpuTime, (int64_t)gpuEnd);
+    TracySerialGpuTime(item->gpuTime.gpuTime, (int64_t)gpuEnd);
     tracyMemWrite(item->gpuTime.queryId, uint16_t(queryId+1));
     tracyMemWrite(item->gpuTime.context, gpuContextId);
 

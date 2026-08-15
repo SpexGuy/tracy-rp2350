@@ -218,8 +218,9 @@ public:
                 break;
             }
             timestamp *= (1000000000ull / disjoint.Frequency);
+
             TracySerialPrepare(QueueType::GpuTime);
-            MemWrite(&item->gpuTime.gpuTime, static_cast<int64_t>(timestamp));
+            TracySerialGpuTime(&item->gpuTime.gpuTime, static_cast<int64_t>(timestamp));
             MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(k));
             MemWrite(&item->gpuTime.context, m_contextId);
             TracySerialCommit;
@@ -355,7 +356,7 @@ public:
         m_ctx->m_immediateDevCtx->End(m_ctx->GetQueryObjectFromId(queryId));
 
         TracySerialPrepare( QueueType::GpuZoneEndSerial );
-        MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneEnd.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, m_ctx->GetContextId() );
@@ -379,7 +380,7 @@ private:
         const auto queryId = m_ctx->NextQueryId();
         m_ctx->m_immediateDevCtx->End(m_ctx->GetQueryObjectFromId(queryId));
 
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, sourceLocation );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
@@ -391,7 +392,7 @@ private:
         const auto queryId = m_ctx->NextQueryId();
         m_ctx->m_immediateDevCtx->End(m_ctx->GetQueryObjectFromId(queryId));
 
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         TracySerialFat( &item->gpuZoneBegin.srcloc, sourceLocation );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );

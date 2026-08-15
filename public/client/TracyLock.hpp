@@ -60,7 +60,7 @@ public:
         TracySerialPrepare( QueueType::LockWait );
         MemWrite( &item->lockWait.thread, GetThreadHandle() );
         MemWrite( &item->lockWait.id, m_id );
-        MemWrite( &item->lockWait.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockWait.time, Profiler::GetTime() );
         TracySerialCommit;
         return true;
     }
@@ -70,7 +70,7 @@ public:
         TracySerialPrepare( QueueType::LockObtain );
         MemWrite( &item->lockObtain.thread, GetThreadHandle() );
         MemWrite( &item->lockObtain.id, m_id );
-        MemWrite( &item->lockObtain.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockObtain.time, Profiler::GetTime() );
         TracySerialCommit;
     }
 
@@ -88,7 +88,7 @@ public:
 
         TracySerialPrepare( QueueType::LockRelease );
         MemWrite( &item->lockRelease.id, m_id );
-        MemWrite( &item->lockRelease.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockRelease.time, Profiler::GetTime() );
         TracySerialCommit;
     }
 
@@ -114,7 +114,7 @@ public:
             TracySerialPrepare( QueueType::LockObtain );
             MemWrite( &item->lockObtain.thread, GetThreadHandle() );
             MemWrite( &item->lockObtain.id, m_id );
-            MemWrite( &item->lockObtain.time, Profiler::GetTime() );
+            TracySerialTime( &item->lockObtain.time, Profiler::GetTime() );
             TracySerialCommit;
         }
     }
@@ -259,7 +259,7 @@ public:
         TracySerialPrepare( QueueType::LockWait );
         MemWrite( &item->lockWait.thread, GetThreadHandle() );
         MemWrite( &item->lockWait.id, m_id );
-        MemWrite( &item->lockWait.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockWait.time, Profiler::GetTime() );
         TracySerialCommit;
         return true;
     }
@@ -269,7 +269,7 @@ public:
         TracySerialPrepare( QueueType::LockObtain );
         MemWrite( &item->lockObtain.thread, GetThreadHandle() );
         MemWrite( &item->lockObtain.id, m_id );
-        MemWrite( &item->lockObtain.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockObtain.time, Profiler::GetTime() );
         TracySerialCommit;
     }
 
@@ -287,7 +287,7 @@ public:
 
         TracySerialPrepare( QueueType::LockRelease );
         MemWrite( &item->lockRelease.id, m_id );
-        MemWrite( &item->lockRelease.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockRelease.time, Profiler::GetTime() );
         TracySerialCommit;
     }
 
@@ -313,7 +313,7 @@ public:
             TracySerialPrepare( QueueType::LockObtain );
             MemWrite( &item->lockObtain.thread, GetThreadHandle() );
             MemWrite( &item->lockObtain.id, m_id );
-            MemWrite( &item->lockObtain.time, Profiler::GetTime() );
+            TracySerialTime( &item->lockObtain.time, Profiler::GetTime() );
             TracySerialCommit;
         }
     }
@@ -336,7 +336,7 @@ public:
         TracySerialPrepare( QueueType::LockSharedWait );
         MemWrite( &item->lockWait.thread, GetThreadHandle() );
         MemWrite( &item->lockWait.id, m_id );
-        MemWrite( &item->lockWait.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockWait.time, Profiler::GetTime() );
         TracySerialCommit;
         return true;
     }
@@ -346,7 +346,7 @@ public:
         TracySerialPrepare( QueueType::LockSharedObtain );
         MemWrite( &item->lockObtain.thread, GetThreadHandle() );
         MemWrite( &item->lockObtain.id, m_id );
-        MemWrite( &item->lockObtain.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockObtain.time, Profiler::GetTime() );
         TracySerialCommit;
     }
 
@@ -365,7 +365,7 @@ public:
         TracySerialPrepare( QueueType::LockSharedRelease );
         MemWrite( &item->lockReleaseShared.thread, GetThreadHandle() );
         MemWrite( &item->lockReleaseShared.id, m_id );
-        MemWrite( &item->lockReleaseShared.time, Profiler::GetTime() );
+        TracySerialTime( &item->lockReleaseShared.time, Profiler::GetTime() );
         TracySerialCommit;
     }
 
@@ -391,7 +391,7 @@ public:
             TracySerialPrepare( QueueType::LockSharedObtain );
             MemWrite( &item->lockObtain.thread, GetThreadHandle() );
             MemWrite( &item->lockObtain.id, m_id );
-            MemWrite( &item->lockObtain.time, Profiler::GetTime() );
+            TracySerialTime( &item->lockObtain.time, Profiler::GetTime() );
             TracySerialCommit;
         }
     }

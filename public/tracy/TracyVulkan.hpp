@@ -297,7 +297,7 @@ public:
             }
 
             TracySerialPrepare( QueueType::GpuTime );
-            MemWrite( &item->gpuTime.gpuTime, m_res[idx * 2] );
+            TracySerialGpuTime( &item->gpuTime.gpuTime, m_res[idx * 2] );
             MemWrite( &item->gpuTime.queryId, uint16_t( wrappedTail + idx ) );
             MemWrite( &item->gpuTime.context, m_context );
             TracySerialCommit;
@@ -515,7 +515,7 @@ public:
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->m_query, queryId ) );
 
         TracySerialPrepare( QueueType::GpuZoneBeginSerial );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
@@ -542,7 +542,7 @@ public:
         TracySerialBegin;
         TracySerialCallstack;
         TracySerialItem( type );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
@@ -570,7 +570,7 @@ public:
         TracySerialSrcLocUnfilled( srcloc, srcloc_sz );
         Profiler::FillSourceLocation( srcloc, srcloc_sz, line, source, sourceSz, function, functionSz, name, nameSz );
         TracySerialItem( QueueType::GpuZoneBeginAllocSrcLocSerial );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         TracySerialFat( &item->gpuZoneBegin.srcloc, srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
@@ -600,7 +600,7 @@ public:
         TracySerialSrcLocUnfilled( srcloc, srcloc_sz );
         Profiler::FillSourceLocation( srcloc, srcloc_sz, line, source, sourceSz, function, functionSz, name, nameSz );
         TracySerialItem( type );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         TracySerialFat( &item->gpuZoneBegin.srcloc, srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
@@ -616,7 +616,7 @@ public:
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( m_cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_ctx->m_query, queryId ) );
 
         TracySerialPrepare( QueueType::GpuZoneEndSerial );
-        MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneEnd.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, m_ctx->GetId() );

@@ -254,14 +254,14 @@ public:
             TracyMetalDebugMasked(1<<2, TracyFreeN((void*)(uintptr_t)(k+1), "TracyMetalGpuZone"));
             {
             TracySerialPrepare(QueueType::GpuTime);
-            MemWrite(&item->gpuTime.gpuTime, static_cast<int64_t>(t_start));
+            TracySerialGpuTime(&item->gpuTime.gpuTime, static_cast<int64_t>(t_start));
             MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(k));
             MemWrite(&item->gpuTime.context, m_contextId);
             TracySerialCommit;
             }
             {
             TracySerialPrepare(QueueType::GpuTime);
-            MemWrite(&item->gpuTime.gpuTime, static_cast<int64_t>(t_end));
+            TracySerialGpuTime(&item->gpuTime.gpuTime, static_cast<int64_t>(t_end));
             MemWrite(&item->gpuTime.queryId, static_cast<uint16_t>(k+1));
             MemWrite(&item->gpuTime.context, m_contextId);
             TracySerialCommit;
@@ -573,7 +573,7 @@ private:
     static void SubmitZoneBeginGpu(MetalCtx* ctx, uint32_t queryId, const SourceLocationData* srcloc)
     {
         TracySerialPrepare( QueueType::GpuZoneBeginSerial );
-        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
@@ -586,7 +586,7 @@ private:
     static void SubmitZoneEndGpu(MetalCtx* ctx, uint32_t queryId)
     {
         TracySerialPrepare( QueueType::GpuZoneEndSerial );
-        MemWrite( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
+        TracySerialTime( &item->gpuZoneEnd.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneEnd.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneEnd.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneEnd.context, ctx->GetContextId() );

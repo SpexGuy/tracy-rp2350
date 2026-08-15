@@ -150,6 +150,15 @@ struct LuaZoneState
 #define TracyLfqFat( _ptr, _value ) \
     tracy::MemWrite( _ptr, _value );
 
+#define TracyLfqThreadTime( _ptr, _time ) \
+    tracy::MemWrite( _ptr, _time );
+
+#define TracyLfqGpuTime( _ptr, _value ) \
+    tracy::MemWrite( _ptr, _value );
+
+#define TracyLfqCtxTime( _ptr, _value ) \
+    tracy::MemWrite( _ptr, _value );
+
 #define TracyLfqCommit \
     __tail.store( __magic + 1, std::memory_order_release );
 
@@ -161,6 +170,7 @@ struct LuaZoneState
 #define TracyLfqSrcLocUnfilledC( _srcloc, _size ) TracyLfqSrcLocUnfilled( _srcloc, _size )
 #define TracyLfqItemC( _type ) TracyLfqItem( _type )
 #define TracyLfqFatC( _ptr, _value ) TracyLfqFat( _ptr, _value )
+#define TracyLfqThreadTimeC( _ptr, _time ) TracyLfqThreadTime( _ptr, _time )
 #define TracyLfqCommitC TracyLfqCommit
 
 
@@ -182,6 +192,12 @@ struct LuaZoneState
     item = tracy::Profiler::QueueSerial( item ); \
     tracy::MemWrite( &item->hdr.type, _type );
 #define TracySerialFat( _ptr, _value ) \
+    tracy::MemWrite( _ptr, _value );
+#define TracySerialTime( _ptr, _value ) \
+    tracy::MemWrite( _ptr, _value );
+#define TracySerialThreadTime( _ptr, _time ) \
+    tracy::MemWrite( _ptr, _time );
+#define TracySerialGpuTime( _ptr, _value ) \
     tracy::MemWrite( _ptr, _value );
 #define TracySerialCommit \
     tracy::Profiler::QueueSerialFinish();
@@ -220,6 +236,7 @@ struct LuaZoneState
 #  define TracyQueueSrcLocUnfilled( _srcloc, _size ) TracySerialSrcLocUnfilled( _srcloc, _size )
 #  define TracyQueueItem( _type ) TracySerialItem( _type )
 #  define TracyQueueFat( _ptr, _value ) TracySerialFat( _ptr, _value )
+#  define TracyQueueThreadTime( _ptr, _time ) TracySerialThreadTime( _ptr, _time )
 #  define TracyQueueThreadCtx( _name ) TracySerialFat( &item->_name.thread, tracy::GetThreadHandle() )
 #  define TracyQueueCommit( _name ) \
     TracyQueueThreadCtx( _name ); \
@@ -232,6 +249,7 @@ struct LuaZoneState
 #  define TracyQueueSrcLocC( _srcloc ) TracySerialSrcLoc( _srcloc )
 #  define TracyQueueItemC( _type ) TracySerialItem( _type )
 #  define TracyQueueFatC( _ptr, _value ) TracySerialFat( _ptr, _value )
+#  define TracyQueueThreadTimeC( _ptr, _time ) TracySerialThreadTime( _ptr, _time )
 #  define TracyQueueCommitC( _name ) \
     TracyQueueThreadCtx( _name ); \
     TracySerialCommit;
@@ -260,12 +278,14 @@ struct LuaZoneState
 #  define TracyQueueItem( _type ) TracyLfqItem( _type )
 #  define TracyQueueFat( _ptr, _value ) TracyLfqFat( _ptr, _value )
 #  define TracyQueueThreadCtx( _name )
+#  define TracyQueueThreadTime( _ptr, _time ) TracyLfqThreadTime( _ptr, _time )
 #  define TracyQueueCommit( _name ) TracyLfqCommit
 #  define TracyQueueBeginC TracyLfqBeginC
 #  define TracyQueueSingleStringC( _ptr, _len ) TracyLfqSingleStringC( _ptr, _len )
 #  define TracyQueueSrcLocC( _srcloc ) TracyLfqSrcLocC( _srcloc )
 #  define TracyQueueItemC( _type ) TracyLfqItemC( _type )
 #  define TracyQueueFatC( _ptr, _value ) TracyLfqFatC( _ptr, _value )
+#  define TracyQueueThreadTimeC( _ptr, _time ) TracyLfqThreadTimeC( _ptr, _time )
 #  define TracyQueueCommitC( _name ) TracyLfqCommitC
 
 #  ifndef TRACY_NO_VERIFY
@@ -331,7 +351,7 @@ struct LuaZoneState
 #define TracySerialMemAlloc( _type, _thread, _ptr, _size ) \
     assert( _type == QueueType::MemAlloc || _type == QueueType::MemAllocCallstack || _type == QueueType::MemAllocNamed || _type == QueueType::MemAllocCallstackNamed ); \
     TracySerialItem( _type ); \
-    tracy::MemWrite( &item->memAlloc.time, tracy::Profiler::GetTime() ); \
+    TracySerialTime( &item->memAlloc.time, tracy::Profiler::GetTime() ); \
     tracy::MemWrite( &item->memAlloc.thread, uint32_t( _thread ) ); \
     tracy::MemWrite( &item->memAlloc.ptr, uint64_t( _ptr ) ); \
     tracy::Profiler::SetMemAllocSize( item, _size );
@@ -339,14 +359,14 @@ struct LuaZoneState
 #define TracySerialMemFree( _type, _thread, _ptr ) \
     assert( _type == QueueType::MemFree || _type == QueueType::MemFreeCallstack || _type == QueueType::MemFreeNamed || _type == QueueType::MemFreeCallstackNamed ); \
     TracySerialItem( _type ); \
-    tracy::MemWrite( &item->memFree.time, tracy::Profiler::GetTime() ); \
+    TracySerialTime( &item->memFree.time, tracy::Profiler::GetTime() ); \
     tracy::MemWrite( &item->memFree.thread, uint32_t( _thread ) ); \
     tracy::MemWrite( &item->memFree.ptr, uint64_t( _ptr ) );
 
 #define TracySerialMemDiscard( _type, _thread, _name ) \
     assert( _type == QueueType::MemDiscard || _type == QueueType::MemDiscardCallstack ); \
     TracySerialItem( _type ); \
-    tracy::MemWrite( &item->memDiscard.time, tracy::Profiler::GetTime() ); \
+    TracySerialTime( &item->memDiscard.time, tracy::Profiler::GetTime() ); \
     tracy::MemWrite( &item->memDiscard.thread, uint32_t( _thread ) ); \
     tracy::MemWrite( &item->memDiscard.name, uint64_t( _name ) );
 
@@ -537,7 +557,7 @@ public:
 #endif
         TracyLfqPrepare( QueueType::PlotDataInt );
         MemWrite( &item->plotDataInt.name, (uint64_t)name );
-        MemWrite( &item->plotDataInt.time, GetTime() );
+        TracyLfqThreadTime( &item->plotDataInt.time, GetTime() );
         MemWrite( &item->plotDataInt.val, val );
         TracyLfqCommit;
     }
@@ -549,7 +569,7 @@ public:
 #endif
         TracyLfqPrepare( QueueType::PlotDataFloat );
         MemWrite( &item->plotDataFloat.name, (uint64_t)name );
-        MemWrite( &item->plotDataFloat.time, GetTime() );
+        TracyLfqThreadTime( &item->plotDataFloat.time, GetTime() );
         MemWrite( &item->plotDataFloat.val, val );
         TracyLfqCommit;
     }
@@ -561,7 +581,7 @@ public:
 #endif
         TracyLfqPrepare( QueueType::PlotDataDouble );
         MemWrite( &item->plotDataDouble.name, (uint64_t)name );
-        MemWrite( &item->plotDataDouble.time, GetTime() );
+        TracyLfqThreadTime( &item->plotDataDouble.time, GetTime() );
         MemWrite( &item->plotDataDouble.val, val );
         TracyLfqCommit;
     }
@@ -856,7 +876,7 @@ public:
         if( !GetProfiler().IsConnected() ) return;
 #endif
         TracyQueuePrepare( QueueType::FiberEnter );
-        MemWrite( &item->fiberEnter.time, GetTime() );
+        TracyQueueThreadTime( &item->fiberEnter.time, GetTime() );
         MemWrite( &item->fiberEnter.fiber, (uint64_t)fiber );
         MemWrite( &item->fiberEnter.groupHint, groupHint );
         TracyQueueCommit( fiberEnter );
@@ -868,7 +888,7 @@ public:
         if( !GetProfiler().IsConnected() ) return;
 #endif
         TracyQueuePrepare( QueueType::FiberLeave );
-        MemWrite( &item->fiberLeave.time, GetTime() );
+        TracyQueueThreadTime( &item->fiberLeave.time, GetTime() );
         TracyQueueCommit( fiberLeave );
     }
 #endif

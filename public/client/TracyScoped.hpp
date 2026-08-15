@@ -46,7 +46,7 @@ public:
         TracyQueueBegin;
         TracyQueueCallstack;
         TracyQueueItem( zoneQueue );
-        MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+        TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
         MemWrite( &item->zoneBegin.srcloc, (uint64_t)srcloc );
         TracyQueueCommit( zoneBeginThread );
     }
@@ -72,7 +72,7 @@ public:
         TracyQueueSrcLocUnfilled( srcloc, srcloc_len );
         Profiler::FillSourceLocation( srcloc, srcloc_len, line, source, sourceSz, function, functionSz, name, nameSz, color);
         TracyQueueItem( zoneQueue );
-        MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+        TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
         TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
         TracyQueueCommit( zoneBeginThread );
     }
@@ -86,7 +86,7 @@ public:
         if( GetProfiler().ConnectionId() != m_connectionId ) return;
 #endif
         TracyQueuePrepare( QueueType::ZoneEnd );
-        MemWrite( &item->zoneEnd.time, Profiler::GetTime() );
+        TracyQueueThreadTime( &item->zoneEnd.time, Profiler::GetTime() );
         TracyQueueCommit( zoneEndThread );
     }
 

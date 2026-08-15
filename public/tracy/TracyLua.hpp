@@ -228,7 +228,7 @@ static inline int LuaZoneBeginS( lua_State* L )
     TracyQueueSrcLocUnfilled( srcloc, srcloc_size );
     Profiler::FillSourceLocation( srcloc, srcloc_size, dbg.currentline, src, src_len, func_name, func_len, nullptr, 0 );
     TracyQueueItem( QueueType::ZoneBeginAllocSrcLocCallstack );
-    MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+    TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
     TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
     TracyQueueCommit( zoneBeginThread );
 
@@ -268,7 +268,7 @@ static inline int LuaZoneBeginNS( lua_State* L )
     TracyQueueSrcLocUnfilled( srcloc, srcloc_size );
     Profiler::FillSourceLocation( srcloc, srcloc_size, dbg.currentline, src, src_len, func_name, func_len, name, nsz );
     TracyQueueItem( QueueType::ZoneBeginAllocSrcLocCallstack );
-    MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+    TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
     TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
     TracyQueueCommit( zoneBeginThread );
 
@@ -303,7 +303,7 @@ static inline int LuaZoneBegin( lua_State* L )
     TracyQueueSrcLocUnfilled( srcloc, srcloc_size );
     Profiler::FillSourceLocation( srcloc, srcloc_size, dbg.currentline, src, src_len, func_name, func_len, nullptr, 0 );
     TracyQueueItem( QueueType::ZoneBeginAllocSrcLoc );
-    MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+    TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
     TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
     TracyQueueCommit( zoneBeginThread );
     return 0;
@@ -339,7 +339,7 @@ static inline int LuaZoneBeginN( lua_State* L )
     TracyQueueSrcLocUnfilled( srcloc, srcloc_size );
     Profiler::FillSourceLocation( srcloc, srcloc_size, dbg.currentline, src, src_len, func_name, func_len, name, nsz );
     TracyQueueItem( QueueType::ZoneBeginAllocSrcLoc );
-    MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+    TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
     TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
     TracyQueueCommit( zoneBeginThread );
     return 0;
@@ -360,7 +360,7 @@ static inline int LuaZoneEnd( lua_State* L )
 #endif
 
     TracyQueuePrepare( QueueType::ZoneEnd );
-    MemWrite( &item->zoneEnd.time, Profiler::GetTime() );
+    TracyQueueThreadTime( &item->zoneEnd.time, Profiler::GetTime() );
     TracyQueueCommit( zoneEndThread );
     return 0;
 }
@@ -490,7 +490,7 @@ static inline void LuaHook( lua_State* L, lua_Debug* ar )
         TracyQueueSrcLocUnfilled( srcloc, srcloc_size );
         Profiler::FillSourceLocation( srcloc, srcloc_size, ar->currentline, src, src_len, func_name, func_len, nullptr, 0 );
         TracyQueueItem( QueueType::ZoneBeginAllocSrcLoc );
-        MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
+        TracyQueueThreadTime( &item->zoneBegin.time, Profiler::GetTime() );
         TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
         TracyQueueCommit( zoneBeginThread );
     }
@@ -506,7 +506,7 @@ static inline void LuaHook( lua_State* L, lua_Debug* ar )
         }
 #endif
         TracyQueuePrepare( QueueType::ZoneEnd );
-        MemWrite( &item->zoneEnd.time, Profiler::GetTime() );
+        TracyQueueThreadTime( &item->zoneEnd.time, Profiler::GetTime() );
         TracyQueueCommit( zoneEndThread );
     }
 }
