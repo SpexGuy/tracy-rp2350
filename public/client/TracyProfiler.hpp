@@ -188,6 +188,7 @@ struct LuaZoneState
 #define TracySerialCommit \
     tracy::Profiler::QueueSerialFinish();
 
+#define _TracyInlineCallstackData
 
 #ifdef TRACY_ON_DEMAND
 #  define _TracyDefer tracy::GetProfiler().DeferItem(*item);
@@ -257,7 +258,42 @@ struct LuaZoneState
 #define TracyLfqPrepare( _type ) TracyLfqBegin; TracyLfqItem( _type )
 #define TracyLfqPrepareC( _type ) TracyLfqBeginC; TracyLfqItemC( _type )
 #define TracySerialPrepare( _type ) TracySerialBegin; TracySerialItem( _type )
-#define TracySerialPrepareCallstack( _type, _callstack ) TracySerialBegin; TracySerialItemCallstack( _type, _callstack )
+
+
+#define _TracyPrepCallstack( _depth, _type_var, _base_type, _callstack_type ) \
+    bool const __using_callstack = _depth > 0 && tracy::has_callstack(); \
+    void * const __callstack = __using_callstack ? tracy::Callstack(_depth) : nullptr ; \
+    tracy::QueueType _type_var = __using_callstack ? _callstack_type : _base_type ;
+
+#define _TracyPrepCallstackCut( _depth, _cut, _type_var, _base_type, _callstack_type ) \
+    bool const __using_callstack = _depth > 0 && has_callstack(); \
+    void * const __callstack = __using_callstack ? tracy::Callstack(_depth) : nullptr ; \
+    if (__using_callstack) { tracy::Profiler::CutCallstack( __callstack, _cut ); } \
+    tracy::QueueType _type_var = __using_callstack ? _callstack_type : _base_type ;
+
+#define _TracySubmitCallstack( _ItemMacro, _FatMacro, _type ) \
+    if (__using_callstack) { \
+        _TracyInlineCallstackData; \
+        _ItemMacro( _type ); \
+        _FatMacro( &item->callstackFat.ptr, (uint64_t)__callstack ); \
+    } else {}
+
+#define TracyQueuePrepCallstack( _depth, _type_var, _base_type, _callstack_type ) _TracyPrepCallstack( _depth, _type_var, _base_type, _callstack_type )
+#define TracyQueuePrepCallstackCut( _depth, _cut, _type_var, _base_type, _callstack_type ) _TracyPrepCallstackCut( _depth, _cut, _type_var, _base_type, _callstack_type )
+
+// Despite being potentially serial, TracyQueue always uses QueueType::Callstack
+#define TracyQueueCallstack \
+    _TracySubmitCallstack( TracyQueueItem, TracyQueueFat, tracy::QueueType::Callstack ); \
+    tracy::MemWrite( &item->callstackFatThread.thread, tracy::GetThreadHandle() );
+
+#define TracySerialPrepCallstack( _depth, _type_var, _base_type, _callstack_type ) _TracyPrepCallstack( _depth, _type_var, _base_type, _callstack_type )
+#define TracySerialPrepCutCallstack( _depth, _cut, _type_var, _base_type, _callstack_type ) _TracyPrepCutCallstack( _depth, _cut, _type_var, _base_type, _callstack_type )
+#define TracySerialCallstack _TracySubmitCallstack( TracySerialItem, TracySerialFat, tracy::QueueType::CallstackSerial )
+
+#define TracyLfqPrepCallstack( _depth, _type_var, _base_type, _callstack_type ) _TracyPrepCallstack( _depth, _type_var, _base_type, _callstack_type )
+#define TracyLfqPrepCutCallstack( _depth, _cut, _type_var, _base_type, _callstack_type ) _TracyPrepCutCallstack( _depth, _cut, _type_var, _base_type, _callstack_type )
+#define TracyLfqCallstack _TracySubmitCallstack( TracyLfqItem, TracyLfqFat, tracy::QueueType::Callstack )
+
 
 
 typedef void(*ParameterCallback)( void* data, uint32_t idx, int32_t val );
@@ -504,15 +540,13 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() ) return;
 #endif
-        if( callstack_depth != 0 && has_callstack() )
-        {
-            tracy::GetProfiler().SendCallstack( callstack_depth );
-        }
 
+        TracyQueuePrepCallstack( callstack_depth, type, QueueType::Message, QueueType::MessageCallstack );
 
         TracyQueueBegin;
+        TracyQueueCallstack;
         TracyQueueSingleString( txt, size );
-        TracyQueueItem( callstack_depth == 0 ? QueueType::Message : QueueType::MessageCallstack );
+        TracyQueueItem( type );
         MemWrite( &item->messageFat.time, GetTime() );
         TracyQueueFat( &item->messageFat.text, (uint64_t)txt );
         TracyQueueFat( &item->messageFat.size, (uint16_t)size );
@@ -524,12 +558,11 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() ) return;
 #endif
-        if( callstack_depth != 0 && has_callstack() )
-        {
-            tracy::GetProfiler().SendCallstack( callstack_depth );
-        }
+        TracyQueuePrepCallstack( callstack_depth, type, QueueType::MessageLiteral, QueueType::MessageLiteralCallstack );
 
-        TracyQueuePrepare( callstack_depth == 0 ? QueueType::MessageLiteral : QueueType::MessageLiteralCallstack );
+        TracyQueueBegin;
+        TracyQueueCallstack;
+        TracyQueueItem( type );
         MemWrite( &item->messageLiteral.time, GetTime() );
         MemWrite( &item->messageLiteral.text, (uint64_t)txt );
         TracyQueueCommit( messageLiteralThread );
@@ -541,14 +574,12 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() ) return;
 #endif
-        if( callstack_depth != 0 && has_callstack() )
-        {
-            tracy::GetProfiler().SendCallstack( callstack_depth );
-        }
+        TracyQueuePrepCallstack( callstack_depth, type, QueueType::MessageColor, QueueType::MessageColorCallstack );
 
         TracyQueueBegin;
+        TracyQueueCallstack;
         TracyQueueSingleString( txt, size );
-        TracyQueueItem( callstack_depth == 0 ? QueueType::MessageColor : QueueType::MessageColorCallstack );
+        TracyQueueItem( type );
         MemWrite( &item->messageColorFat.time, GetTime() );
         MemWrite( &item->messageColorFat.b, uint8_t( ( color       ) & 0xFF ) );
         MemWrite( &item->messageColorFat.g, uint8_t( ( color >> 8  ) & 0xFF ) );
@@ -563,12 +594,11 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() ) return;
 #endif
-        if( callstack_depth != 0 && has_callstack() )
-        {
-            tracy::GetProfiler().SendCallstack( callstack_depth );
-        }
+        TracyQueuePrepCallstack( callstack_depth, type, QueueType::MessageLiteralColor, QueueType::MessageLiteralColorCallstack );
 
-        TracyQueuePrepare( callstack_depth == 0 ? QueueType::MessageLiteralColor : QueueType::MessageLiteralColorCallstack );
+        TracyQueueBegin;
+        TracyQueueCallstack;
+        TracyQueueItem( type );
         MemWrite( &item->messageColorLiteral.time, GetTime() );
         MemWrite( &item->messageColorLiteral.text, (uint64_t)txt );
         MemWrite( &item->messageColorLiteral.b, uint8_t( ( color       ) & 0xFF ) );
@@ -841,7 +871,6 @@ public:
     }
 #endif
 
-    void SendCallstack( int32_t depth, const char* skipBefore );
     static void CutCallstack( void* callstack, const char* skipBefore );
 
     static bool ShouldExit();

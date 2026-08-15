@@ -384,7 +384,11 @@ namespace tracy
         {
             if (!m_active) return;
 
-            TracySerialPrepareCallstack(QueueType::GpuZoneBeginCallstackSerial);
+            TracySerialPrepCallstack( depth, type, QueueType::GpuZoneBeginSerial, QueueType::GpuZoneBeginCallstackSerial );
+
+            TracySerialBegin;
+            TracySerialCallstack;
+            TracySerialItem( type );
             WriteQueueItemStatic(item, reinterpret_cast<uint64_t>(srcLocation));
             TracySerialCommit;
         }
@@ -409,14 +413,15 @@ namespace tracy
         {
             if (!m_active) return;
 
-            auto callstack = Callstack(depth);
+            TracySerialPrepCallstack( depth, type, QueueType::GpuZoneBeginAllocSrcLocSerial, QueueType::GpuZoneBeginAllocSrcLocCallstackSerial );
 
             const auto sz = Profiler::SourceLocationSize(sourceSz, functionSz, nameSz);
 
             TracySerialBegin;
+            TracySerialCallstack;
             TracySerialSrcLocUnfilled( sourceLocation, sz );
             Profiler::FillSourceLocation( sourceLocation, sz, line, source, sourceSz, function, functionSz, name, nameSz );
-            TracySerialItemCallstack( QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, callstack );
+            TracySerialItem( type );
             WriteQueueItemAlloc(item, sourceLocation);
             TracySerialCommit;
         }

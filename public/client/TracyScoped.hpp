@@ -40,13 +40,12 @@ public:
 #ifdef TRACY_ON_DEMAND
         m_connectionId = GetProfiler().ConnectionId();
 #endif
-        auto zoneQueue = QueueType::ZoneBegin;
-        if( depth > 0 && has_callstack() )
-        {
-            GetProfiler().SendCallstack( depth );
-            zoneQueue = QueueType::ZoneBeginCallstack;
-        }
-        TracyQueuePrepare( zoneQueue );
+
+        TracyQueuePrepCallstack( depth, zoneQueue, QueueType::ZoneBegin, QueueType::ZoneBeginCallstack );
+
+        TracyQueueBegin;
+        TracyQueueCallstack;
+        TracyQueueItem( zoneQueue );
         MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
         MemWrite( &item->zoneBegin.srcloc, (uint64_t)srcloc );
         TracyQueueCommit( zoneBeginThread );
@@ -63,16 +62,13 @@ public:
 #ifdef TRACY_ON_DEMAND
         m_connectionId = GetProfiler().ConnectionId();
 #endif
-        auto zoneQueue = QueueType::ZoneBeginAllocSrcLoc;
-        if( depth > 0 && has_callstack() )
-        {
-            GetProfiler().SendCallstack( depth );
-            zoneQueue = QueueType::ZoneBeginAllocSrcLocCallstack;
-        }
+
+        TracyQueuePrepCallstack( depth, zoneQueue, tracy::QueueType::ZoneBeginAllocSrcLoc, tracy::QueueType::ZoneBeginAllocSrcLocCallstack );
 
         uint16_t srcloc_len = Profiler::SourceLocationSize( sourceSz, functionSz, nameSz );
 
         TracyQueueBegin;
+        TracyQueueCallstack;
         TracyQueueSrcLocUnfilled( srcloc, srcloc_len );
         Profiler::FillSourceLocation( srcloc, srcloc_len, line, source, sourceSz, function, functionSz, name, nameSz, color);
         TracyQueueItem( zoneQueue );

@@ -257,9 +257,11 @@ namespace tracy {
 
             m_beginQueryId = ctx->NextQueryId(EventInfo{ nullptr, EventPhase::Begin });
 
-            GetProfiler().SendCallstack(depth);
+            TracySerialPrepCallstack( depth, type, QueueType::GpuZoneBeginSerial, QueueType::GpuZoneBeginCallstackSerial );
 
-            TracySerialPrepare(QueueType::GpuZoneBeginCallstackSerial);
+            TracySerialBegin;
+            TracySerialCallstack;
+            TracySerialItem( type );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)srcLoc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
@@ -310,12 +312,13 @@ namespace tracy {
 
             const auto srcloc_sz = Profiler::SourceLocationSize(sourceSz, functionSz, nameSz);
     
-            auto callstack = Callstack( depth );
+            TracySerialPrepCallstack( depth, type, QueueType::GpuZoneBeginAllocSrcLocSerial, QueueType::GpuZoneBeginAllocSrcLocCallstackSerial );
 
             TracySerialBegin;
+            TracySerialCallstack;
             TracySerialSrcLocUnfilled( srcloc, srcloc_sz );
             Profiler::FillSourceLocation( srcloc, srcloc_sz, line, source, sourceSz, function, functionSz, name, nameSz );
-            TracySerialItemCallstack( QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, callstack );
+            TracySerialItem( type );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
             TracySerialFat(&item->gpuZoneBegin.srcloc, srcloc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());

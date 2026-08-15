@@ -229,8 +229,11 @@ public:
         TracyLfqPrepare( QueueType::GpuZoneBegin );
         memset( &item->gpuZoneBegin.thread, 0, sizeof( item->gpuZoneBegin.thread ) );
 #else
-        GetProfiler().SendCallstack( depth );
-        TracyLfqPrepare( QueueType::GpuZoneBeginCallstack );
+        TracyLfqPrepCallstack( depth, type, tracy::QueueType::GpuZoneBegin, tracy::QueueType::GpuZoneBeginCallstack );
+
+        TracyLfqBegin;
+        TracyLfqCallstack;
+        TracyLfqItem( type );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
 #endif
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
@@ -287,8 +290,10 @@ public:
         TracyLfqItem( QueueType::GpuZoneBeginAllocSrcLoc );
         memset( &item->gpuZoneBegin.thread, 0, sizeof( item->gpuZoneBegin.thread ) );
 #else
-        GetProfiler().SendCallstack( depth );
+        TracyLfqPrepCallstack( depth, type, QueueType::GpuZoneBeginAllocSrcLoc, QueueType::GpuZoneBeginAllocSrcLocCallstack );
+
         TracyLfqBegin;
+        TracyLfqCallstack;
         TracyLfqSrcLocUnfilled( srcloc, srcloc_len );
         Profiler::FillSourceLocation( srcloc, srcloc_len, line, source, sourceSz, function, functionSz, name, nameSz );
         TracyLfqItem( QueueType::GpuZoneBeginAllocSrcLocCallstack );
