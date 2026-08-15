@@ -181,13 +181,12 @@ struct LuaZoneState
 #define TracySerialItem( _type ) \
     item = tracy::Profiler::QueueSerial( item ); \
     tracy::MemWrite( &item->hdr.type, _type );
-#define TracySerialItemCallstack( _type, _callstack ) \
-    item = tracy::Profiler::QueueSerialCallstack( _callstack, item ); \
-    tracy::MemWrite( &item->hdr.type, _type );
 #define TracySerialFat( _ptr, _value ) \
     tracy::MemWrite( _ptr, _value );
 #define TracySerialCommit \
     tracy::Profiler::QueueSerialFinish();
+
+
 
 #define _TracyInlineCallstackData
 
@@ -467,19 +466,6 @@ public:
         } else {
             p.m_serialLock.lock();
         }
-        return p.m_serialQueue.prepare_next();
-    }
-
-    static tracy_force_inline QueueItem* QueueSerialCallstack( void* ptr, QueueItem* prev_item = nullptr )
-    {
-        auto& p = GetProfiler();
-        if (prev_item) {
-            // already locked
-            p.m_serialQueue.commit_next();
-        } else {
-            p.m_serialLock.lock();
-        }
-        p.SendCallstackSerial( ptr );
         return p.m_serialQueue.prepare_next();
     }
 
@@ -1079,17 +1065,6 @@ private:
     void CalibrateTimer();
     void CalibrateDelay();
     void ReportTopology();
-
-    static tracy_force_inline void SendCallstackSerial( void* ptr )
-    {
-        if( has_callstack() )
-        {
-            auto item = GetProfiler().m_serialQueue.prepare_next();
-            MemWrite( &item->hdr.type, QueueType::CallstackSerial );
-            MemWrite( &item->callstackFat.ptr, (uint64_t)ptr );
-            GetProfiler().m_serialQueue.commit_next();
-        }
-    }
 
     static tracy_force_inline void SetMemAllocSize( QueueItem* item, size_t size )
     {
