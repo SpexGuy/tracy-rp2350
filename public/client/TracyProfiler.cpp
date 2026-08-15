@@ -907,6 +907,7 @@ LONG WINAPI CrashFilterExecute( PEXCEPTION_POINTERS pExp )
 #endif
 
 static Profiler* s_instance = nullptr;
+#if !defined TRACY_NO_THREADS
 static Thread* s_thread;
 #ifndef TRACY_NO_FRAME_IMAGE
 static Thread* s_compressThread;
@@ -917,6 +918,7 @@ std::atomic<bool> s_symbolThreadGone { false };
 #endif
 #ifdef TRACY_HAS_SYSTEM_TRACING
 static std::atomic<Thread*> s_sysTraceThread = nullptr;
+#endif
 #endif
 
 #if defined __linux__ && !defined TRACY_NO_CRASH_HANDLER
@@ -1613,6 +1615,7 @@ void Profiler::SpawnWorkerThreads()
     StartSystemTracing( m_samplingPeriod );
 #endif
 
+#if !defined TRACY_NO_THREADS
     s_thread = (Thread*)tracy_malloc( sizeof( Thread ) );
     new(s_thread) Thread( LaunchWorker, this );
 
@@ -1632,6 +1635,7 @@ void Profiler::SpawnWorkerThreads()
     s_symbolThreadId = GetThreadId( s_symbolThread->Handle() );
 #  endif
 #endif
+#endif
 
 #ifdef TRACY_HAS_CALLSTACK
     InitCallstackCritical();
@@ -1650,6 +1654,7 @@ Profiler::~Profiler()
     StopSystemTracing();
 #endif
 
+#if !defined TRACY_NO_THREADS
 #ifdef TRACY_HAS_CALLSTACK
     s_symbolThread->~Thread();
     tracy_free( s_symbolThread );
@@ -1662,6 +1667,7 @@ Profiler::~Profiler()
 
     s_thread->~Thread();
     tracy_free( s_thread );
+#endif
 
 #ifdef TRACY_HAS_CALLSTACK
     EndCallstack();
@@ -1694,6 +1700,7 @@ bool Profiler::ShouldExit()
     return s_instance->m_shutdown.load( std::memory_order_relaxed );
 }
 
+#ifndef TRACY_NO_THREADS
 void Profiler::Worker()
 {
 #if defined __linux__ && !defined TRACY_NO_CRASH_HANDLER
@@ -2206,6 +2213,586 @@ void Profiler::Worker()
     }
 }
 
+#else
+
+void Profiler::PollWorker() {
+    #define POLL_CASE(Name) \
+        case PollState::Name: \
+        Case##Name:
+    
+    #define TRANSITION(Name) \
+        do { \
+            m_pollState = PollState::Name; \
+            goto Case##Name; \
+        } while (0)
+
+    switch (m_pollState) {
+        POLL_CASE(Startup)
+        {
+        #if defined __linux__ && !defined TRACY_NO_CRASH_HANDLER
+            s_profilerTid = syscall( SYS_gettid );
+        #endif
+
+            ThreadExitHandler threadExitHandler;
+
+            SetThreadName( "Tracy Profiler" );
+
+            TRANSITION(WaitForTimeBegin);
+        }
+        POLL_CASE(WaitForTimeBegin)
+        {
+            if (m_timeBegin.load( std::memory_order_relaxed ) == 0) return;
+            TRANSITION(Initialize);
+        }
+        POLL_CASE(Initialize)
+        {
+        #ifdef TRACY_USE_RPMALLOC
+            rpmalloc_thread_initialize();
+        #endif
+
+            m_exectime = 0;
+            const auto execname = GetProcessExecutablePath();
+            if( execname )
+            {
+                struct stat st;
+                if( stat( execname, &st ) == 0 )
+                {
+                    m_exectime = (uint64_t)st.st_mtime;
+                }
+            }
+
+            const auto procname = GetProcessName();
+            const auto pnsz = std::min<size_t>( strlen( procname ), WelcomeMessageProgramNameSize - 1 );
+
+            const auto hostinfo = GetHostInfo();
+            const auto hisz = std::min<size_t>( strlen( hostinfo ), WelcomeMessageHostInfoSize - 1 );
+
+            const uint64_t pid = GetPid();
+
+            uint8_t flags = 0;
+
+        #ifdef TRACY_ON_DEMAND
+            flags |= WelcomeFlag::OnDemand;
+        #endif
+        #if defined TRACY_IGNORE_MEMORY_FAULTS || defined __APPLE__
+            flags |= WelcomeFlag::IgnoreMemFaults;
+        #endif
+        #ifndef TRACY_NO_CODE_TRANSFER
+            flags |= WelcomeFlag::CodeTransfer;
+        #endif
+        #ifdef _WIN32
+            flags |= WelcomeFlag::CombineSamples;
+        #  ifndef TRACY_NO_CONTEXT_SWITCH
+            flags |= WelcomeFlag::IdentifySamples;
+        #  endif
+        #endif
+
+        #if defined __i386 || defined _M_IX86
+            uint8_t cpuArch = CpuArchX86;
+        #elif defined __x86_64__ || defined _M_X64
+            uint8_t cpuArch = CpuArchX64;
+        #elif defined __aarch64__
+            uint8_t cpuArch = CpuArchArm64;
+        #elif defined __ARM_ARCH
+            uint8_t cpuArch = CpuArchArm32;
+        #else
+            uint8_t cpuArch = CpuArchUnknown;
+        #endif
+
+        #if defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64
+            uint32_t regs[4];
+            char manufacturer[12];
+            CpuId( regs, 0 );
+            memcpy( manufacturer, regs+1, 4 );
+            memcpy( manufacturer+4, regs+3, 4 );
+            memcpy( manufacturer+8, regs+2, 4 );
+
+            CpuId( regs, 1 );
+            uint32_t cpuId = ( regs[0] & 0xFFF ) | ( ( regs[0] & 0xFFF0000 ) >> 4 );
+        #else
+            const char manufacturer[12] = {};
+            uint32_t cpuId = 0;
+        #endif
+
+            MemWrite( &m_welcome.timerMul, m_timerMul );
+            MemWrite( &m_welcome.initBegin, GetInitTime() );
+            MemWrite( &m_welcome.initEnd, m_timeBegin.load( std::memory_order_relaxed ) );
+            MemWrite( &m_welcome.resolution, m_resolution );
+            MemWrite( &m_welcome.epoch, m_epoch );
+            MemWrite( &m_welcome.exectime, m_exectime );
+            MemWrite( &m_welcome.pid, pid );
+            MemWrite( &m_welcome.samplingPeriod, m_samplingPeriod );
+            MemWrite( &m_welcome.flags, flags );
+            MemWrite( &m_welcome.cpuArch, cpuArch );
+            memcpy( m_welcome.cpuManufacturer, manufacturer, 12 );
+            MemWrite( &m_welcome.cpuId, cpuId );
+            memcpy( m_welcome.programName, procname, pnsz );
+            memset( m_welcome.programName + pnsz, 0, WelcomeMessageProgramNameSize - pnsz );
+            memcpy( m_welcome.hostInfo, hostinfo, hisz );
+            memset( m_welcome.hostInfo + hisz, 0, WelcomeMessageHostInfoSize - hisz );
+
+            m_token.emplace( GetQueue() );
+
+        #ifdef TRACY_DATA_PORT
+            const bool dataPortSearch = false;
+            auto dataPort = m_userPort != 0 ? m_userPort : TRACY_DATA_PORT;
+        #else
+            const bool dataPortSearch = m_userPort == 0;
+            auto dataPort = m_userPort != 0 ? m_userPort : 8086;
+        #endif
+        #ifdef TRACY_BROADCAST_PORT
+            m_broadcastPort = TRACY_BROADCAST_PORT;
+        #else
+            m_broadcastPort = 8086;
+        #endif
+
+            m_listen.emplace();
+            bool isListening = false;
+            if( !dataPortSearch )
+            {
+                isListening = m_listen->Listen( dataPort, 4 );
+            }
+            else
+            {
+                for( uint32_t i=0; i<20; i++ )
+                {
+                    if( m_listen->Listen( dataPort+i, 4 ) )
+                    {
+                        dataPort += i;
+                        isListening = true;
+                        break;
+                    }
+                }
+            }
+            if( !isListening )
+            {
+                TRANSITION(NotListeningLoop);
+            }
+
+        #ifndef TRACY_NO_BROADCAST
+            m_broadcast.emplace();
+        #  ifdef TRACY_ONLY_LOCALHOST
+            const char* addr = "127.255.255.255";
+        #  elif defined TRACY_CLIENT_ADDRESS
+            const char* addr = TRACY_CLIENT_ADDRESS;
+        #  elif defined __QNX__
+            // global broadcast address of 255.255.255.255 is not well-supported by QNX,
+            // use the interface broadcast address instead, e.g. "const char* addr = 192.168.1.255;"
+        #    error Need to specify TRACY_CLIENT_ADDRESS for a QNX target.
+        #  else
+            const char* addr = "255.255.255.255";
+        #  endif
+            if( !m_broadcast->Open( addr, m_broadcastPort ) )
+            {
+                m_broadcast = std::nullopt;
+            }
+        #endif
+
+            m_broadcastLen = 0;
+            m_broadcastMsg = GetBroadcastMessage( procname, pnsz, m_broadcastLen, dataPort );
+            m_lastBroadcast = 0;
+
+            TRANSITION(WaitForConnection);
+        }
+        POLL_CASE(WaitForConnection)
+        {
+#ifndef TRACY_NO_EXIT
+            if( !m_noExit && ShouldExit() )
+            {
+                if( m_broadcast )
+                {
+                    m_broadcastMsg.activeTime = -1;
+                    m_broadcast->Send( m_broadcastPort, &m_broadcastMsg, m_broadcastLen );
+                }
+                TRANSITION(Terminate);
+            }
+#endif
+            m_listen->Accept(m_sock);
+            if( m_sock ) {
+                TRANSITION(NewConnection);
+            }
+#ifndef TRACY_ON_DEMAND
+            ProcessSysTime();
+#  ifdef TRACY_HAS_SYSPOWER
+            m_sysPower.Tick();
+#  endif
+#endif
+
+            if( m_broadcast )
+            {
+                const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                if( t - m_lastBroadcast > 3000000000 )  // 3s
+                {
+                    m_programNameLock.lock();
+                    if( m_programName )
+                    {
+                        m_broadcastMsg = GetBroadcastMessage( m_programName, strlen( m_programName ), m_broadcastLen, m_broadcastMsg.listenPort );
+                        m_programName = nullptr;
+                    }
+                    m_programNameLock.unlock();
+
+                    m_lastBroadcast = t;
+                    const auto ts = std::chrono::duration_cast<std::chrono::seconds>( std::chrono::system_clock::now().time_since_epoch() ).count();
+                    m_broadcastMsg.activeTime = int32_t( ts - m_epoch );
+                    assert( m_broadcastMsg.activeTime >= 0 );
+                    m_broadcast->Send( m_broadcastPort, &m_broadcastMsg, m_broadcastLen );
+                }
+            }
+            return;
+        }
+        POLL_CASE(NewConnection)
+        {
+            if( m_broadcast )
+            {
+                m_lastBroadcast = 0;
+                m_broadcastMsg.activeTime = -1;
+                m_broadcast->Send( m_broadcastPort, &m_broadcastMsg, m_broadcastLen );
+            }
+
+            // Handshake
+            {
+                char shibboleth[HandshakeShibbolethSize];
+                auto res = m_sock->ReadRaw( shibboleth, HandshakeShibbolethSize, 2000 );
+                if( !res || memcmp( shibboleth, HandshakeShibboleth, HandshakeShibbolethSize ) != 0 )
+                {
+                    m_sock = std::nullopt;
+                    TRANSITION(WaitForConnection);
+                }
+
+                uint32_t protocolVersion;
+                res = m_sock->ReadRaw( &protocolVersion, sizeof( protocolVersion ), 2000 );
+                if( !res )
+                {
+                    m_sock = std::nullopt;
+                    TRANSITION(WaitForConnection);
+                }
+
+                if( protocolVersion != ProtocolVersion )
+                {
+                    HandshakeStatus status = HandshakeProtocolMismatch;
+                    m_sock->Send( &status, sizeof( status ) );
+                    m_sock = std::nullopt;
+                    TRANSITION(WaitForConnection);
+                }
+            }
+        }
+    #ifdef TRACY_ON_DEMAND
+    #  ifdef TRACY_HAS_CALLSTACK
+        TRANSITION(WaitForSymbols);
+        POLL_CASE(WaitForSymbols)
+        {
+            // Only wait on m_symbolsBusy if the symbol worker thread exists; otherwise nobody
+            // ever resets the flag and we'd spin forever on the second connection.
+            if (m_symbolsBusy.load( std::memory_order_acquire )) return;
+            m_symbolsBusy.store( true, std::memory_order_release );
+            TRANSITION(NewConnectionHasSymbols);
+        }
+        POLL_CASE(NewConnectionHasSymbols)
+    #  endif
+        {
+            const auto currentTime = GetTime();
+            ClearQueues( *m_token );
+            m_connectionId.fetch_add( 1, std::memory_order_release );
+        }
+    #endif
+        {
+            m_isConnected.store( true, std::memory_order_release );
+            InstallCrashHandler();
+
+            HandshakeStatus handshake = HandshakeWelcome;
+            m_sock->Send( &handshake, sizeof( handshake ) );
+
+            LZ4_resetStream( (LZ4_stream_t*)m_stream );
+            m_sock->Send( &m_welcome, sizeof( m_welcome ) );
+
+            m_threadCtx = 0;
+            m_refTimeSerial = 0;
+            m_refTimeCtx = 0;
+            m_refTimeGpu = 0;
+
+    #ifdef TRACY_ON_DEMAND
+            OnDemandPayloadMessage onDemand;
+            onDemand.frames = m_frameCount.load( std::memory_order_relaxed );
+            onDemand.currentTime = currentTime;
+
+            m_sock->Send( &onDemand, sizeof( onDemand ) );
+
+            m_deferredLock.lock();
+            for( auto& item : m_deferredQueue )
+            {
+                uint64_t ptr;
+                uint16_t size;
+                const auto idx = MemRead( &item.hdr.idx );
+                switch( (QueueType)idx )
+                {
+                    case QueueType::MessageAppInfo:
+                        ptr = MemRead<uint64_t>( &item.messageFat.text );
+                        size = MemRead<uint16_t>( &item.messageFat.size );
+                        SendSingleString( (const char*)ptr, size );
+                        break;
+                    case QueueType::LockName:
+                        ptr = MemRead<uint64_t>( &item.lockNameFat.name );
+                        size = MemRead<uint16_t>( &item.lockNameFat.size );
+                        SendSingleString( (const char*)ptr, size );
+                        break;
+                    case QueueType::GpuContextName:
+                        ptr = MemRead<uint64_t>( &item.gpuContextNameFat.ptr );
+                        size = MemRead<uint16_t>( &item.gpuContextNameFat.size );
+                        SendSingleString( (const char*)ptr, size );
+                        break;
+                    default:
+                    break;
+                }
+                AppendData( &item, QueueDataSize[idx] );
+            }
+            m_deferredLock.unlock();
+    #endif
+
+            // Main communications loop
+            m_keepAlive = 0;
+            TRANSITION(Connected);
+        }
+        case PollState::Connected:
+        LoopConnected:
+        {
+            bool connActive = true;
+            while( m_sock->HasData() )
+            {
+                connActive = HandleServerQuery();
+                if( !connActive ) TRANSITION(PostConnected);
+            }
+            if( !connActive || ShouldExit() ) TRANSITION(PostConnected);
+        }
+        // Fall through
+        CaseConnected: // Note Connected state enters here, not at the case label
+        {
+            ProcessSysTime();
+#ifdef TRACY_HAS_SYSPOWER
+            m_sysPower.Tick();
+#endif
+            const auto status = Dequeue( *m_token );
+            const auto serialStatus = DequeueSerial();
+            if( status == DequeueStatus::ConnectionLost || serialStatus == DequeueStatus::ConnectionLost )
+            {
+                TRANSITION(PostConnected);
+            }
+            else if( status == DequeueStatus::QueueEmpty && serialStatus == DequeueStatus::QueueEmpty )
+            {
+                if( m_bufferOffset != m_bufferStart )
+                {
+                    if( !CommitData() ) {
+                        TRANSITION(PostConnected);
+                    }
+                }
+                if( m_keepAlive == 500 )
+                {
+                    QueueItem ka;
+                    ka.hdr.type = QueueType::KeepAlive;
+                    AppendData( &ka, QueueDataSize[ka.hdr.idx] );
+                    if( !CommitData() ) {
+                        TRANSITION(PostConnected);
+                    }
+
+                    m_keepAlive = 0;
+                }
+                else if( !m_sock->HasData() )
+                {
+                    m_keepAlive++;
+                    return; // Sleep until more data
+                }
+            }
+            else
+            {
+                m_keepAlive = 0;
+            }
+
+            goto LoopConnected;
+        }
+        POLL_CASE(PostConnected)
+        {
+            if( ShouldExit() ) TRANSITION(ShuttingDown);
+
+            m_isConnected.store( false, std::memory_order_release );
+            RemoveCrashHandler();
+
+    #ifdef TRACY_ON_DEMAND
+            m_bufferOffset = 0;
+            m_bufferStart = 0;
+    #endif
+
+            m_sock = std::nullopt;
+
+#ifdef TRACY_ON_DEMAND
+            TRANSITION(WaitForConnection);
+#else
+            TRANSITION(RejectConnections);
+        }
+        POLL_CASE(RejectConnections)
+        {
+            // Client is no longer available here. Accept incoming connections, but reject handshake.
+            if( ShouldExit() )
+            {
+                TRANSITION(Terminate);
+            }
+
+            ClearQueues( *m_token );
+
+            m_listen->Accept(m_sock);
+            if( m_sock )
+            {
+                char shibboleth[HandshakeShibbolethSize];
+                auto res = m_sock->ReadRaw( shibboleth, HandshakeShibbolethSize, 1000 );
+                if( !res || memcmp( shibboleth, HandshakeShibboleth, HandshakeShibbolethSize ) != 0 )
+                {
+                    m_sock = std::nullopt;
+                    return;
+                }
+
+                uint32_t protocolVersion;
+                res = m_sock->ReadRaw( &protocolVersion, sizeof( protocolVersion ), 1000 );
+                if( !res )
+                {
+                    m_sock = std::nullopt;
+                    return;
+                }
+
+                HandshakeStatus status = HandshakeNotAvailable;
+                m_sock->Send( &status, sizeof( status ) );
+                m_sock = std::nullopt;
+            }
+            return;
+#endif
+        }
+        POLL_CASE(ShuttingDown)
+        {
+            // Wait for symbols thread to terminate. Symbol resolution will continue in this thread.
+        #ifdef TRACY_HAS_CALLSTACK
+            TRANSITION(WaitForSymbolThreadGone);
+        }
+        POLL_CASE(WaitForSymbolThreadGone)
+        {
+            if( s_symbolThreadGone.load() == false ) return;
+            TRANSITION(ShutdownAfterSymbolThread);
+        }
+        POLL_CASE(ShutdownAfterSymbolThread)
+        {
+        #endif
+
+        #ifdef TRACY_HAS_SYSTEM_TRACING
+            // On a typical shutdown scenario, the (global) Profiler object is destroyed by
+            // the C++ runtime when the client program returns from "main", and ~Profiler()
+            // takes care of calling StopSystemTracing(). However, a client may decide to
+            // manually RequestShutdown(), in which case ~Profile() may not execute before
+            // this Worker() thread goes through its teardown stages and reaches this point.
+            // To ensure that system tracing does not keep pushing data to the worker queue
+            // indefinitely (thus preventing this worker from terminating), we have to call
+            // StopSystemTracing() here as well to be safe:
+            StopSystemTracing();
+        #endif
+
+            // Send items remaining in queues.
+            for(;;)
+            {
+                const auto status = Dequeue( *m_token );
+                const auto serialStatus = DequeueSerial();
+                if( status == DequeueStatus::ConnectionLost || serialStatus == DequeueStatus::ConnectionLost )
+                {
+                    TRANSITION(Terminate);
+                }
+                else if( status == DequeueStatus::QueueEmpty && serialStatus == DequeueStatus::QueueEmpty )
+                {
+                    if( m_bufferOffset != m_bufferStart ) CommitData();
+                    break;
+                }
+
+                while( m_sock->HasData() )
+                {
+                    if( !HandleServerQuery() )
+                    {
+                        TRANSITION(Terminate);
+                    }
+                }
+
+        #ifdef TRACY_HAS_CALLSTACK
+                for(;;)
+                {
+                    auto si = m_symbolQueue.front();
+                    if( !si ) break;
+                    HandleSymbolQueueItem( *si );
+                    m_symbolQueue.pop();
+                }
+        #endif
+            }
+
+            // Send client termination notice to the server
+            QueueItem terminate;
+            MemWrite( &terminate.hdr.type, QueueType::Terminate );
+            if( !SendData( (const char*)&terminate, 1 ) )
+            {
+                TRANSITION(Terminate);
+            }
+            // Handle remaining server queries
+            for(;;)
+            {
+                while( m_sock->HasData() )
+                {
+                    if( !HandleServerQuery() )
+                    {
+                        TRANSITION(Terminate);
+                    }
+                }
+        #ifdef TRACY_HAS_CALLSTACK
+                for(;;)
+                {
+                    auto si = m_symbolQueue.front();
+                    if( !si ) break;
+                    HandleSymbolQueueItem( *si );
+                    m_symbolQueue.pop();
+                }
+        #endif
+                const auto status = Dequeue( *m_token );
+                const auto serialStatus = DequeueSerial();
+                if( status == DequeueStatus::ConnectionLost || serialStatus == DequeueStatus::ConnectionLost )
+                {
+                    TRANSITION(Terminate);
+                }
+                if( m_bufferOffset != m_bufferStart )
+                {
+                    if( !CommitData() )
+                    {
+                        TRANSITION(Terminate);
+                    }
+                }
+            }
+            TRANSITION(Terminate);
+        }
+        POLL_CASE(NotListeningLoop)
+        {
+            if( ShouldExit() )
+            {
+                TRANSITION(Terminate);
+            }
+
+            ClearQueues( *m_token );
+            return;
+        }
+        POLL_CASE(Terminate)
+        {
+            m_shutdownFinished.store( true, std::memory_order_relaxed );
+            m_listen = std::nullopt;
+            m_token = std::nullopt;
+            TRANSITION(PostTerminated);
+        }
+        POLL_CASE(PostTerminated)
+        {
+            return;
+        }
+    }
+    #undef POLL_CASE
+    #undef TRANSITION
+}
+#endif
+
 #ifndef TRACY_NO_FRAME_IMAGE
 void Profiler::CompressWorker()
 {
@@ -2404,11 +2991,18 @@ static void FreeAssociatedMemory( const QueueItem& item )
 
 void Profiler::ClearQueues( moodycamel::ConsumerToken& token )
 {
+#ifdef TRACY_BYTESTREAM_QUEUE
+    for (Bytestream<>& bs : GetBytestreams())
+    {
+        bs.consume_data([] ( void *ptr, size_t len ) { });
+    }
+#else
     for(;;)
     {
         const auto sz = GetQueue().try_dequeue_bulk_single( token, [](const uint64_t&){}, []( QueueItem* item, size_t sz ) { assert( sz > 0 ); while( sz-- > 0 ) FreeAssociatedMemory( *item++ ); } );
         if( sz == 0 ) break;
     }
+#endif
 
     ClearSerial();
 }
@@ -2438,6 +3032,29 @@ void Profiler::ClearSerial()
 Profiler::DequeueStatus Profiler::Dequeue( moodycamel::ConsumerToken& token )
 {
     bool connectionLost = false;
+#ifdef TRACY_BYTESTREAM_QUEUE
+    size_t sz = 0;
+    for (Bytestream<>& bs : GetBytestreams())
+    {
+        if (bs.consumer_estimate_used_size() != 0)
+        {
+            QueueItem item;
+            MemWrite( &item.hdr.type, QueueType::ThreadContext );
+            MemWrite( &item.threadCtx.thread, bs.threadId );
+            if( !AppendData( &item, QueueDataSize[(int)QueueType::ThreadContext] ) )
+            {
+                connectionLost = true;
+            }
+
+            sz += bs.consume_data(
+                [this, &connectionLost] ( void *ptr, size_t len )
+                {
+                    if (connectionLost) return;
+                    if (!AppendData( ptr, len )) connectionLost = true;
+                });
+        }
+    }
+#else
     const auto sz = GetQueue().try_dequeue_bulk_single( token,
         [this, &connectionLost] ( const uint32_t& threadId )
         {
@@ -2682,7 +3299,6 @@ Profiler::DequeueStatus Profiler::Dequeue( moodycamel::ConsumerToken& token )
                         ++item;
                         continue;
                     }
-#endif
 #ifdef TRACY_HAS_SYSTEM_TRACING
                     case QueueType::ExternalNameMetadata:
                     {
@@ -2707,6 +3323,7 @@ Profiler::DequeueStatus Profiler::Dequeue( moodycamel::ConsumerToken& token )
                         ++item;
                         continue;
                     }
+#endif
                     default:
                         assert( false );
                         break;
@@ -2726,6 +3343,7 @@ Profiler::DequeueStatus Profiler::Dequeue( moodycamel::ConsumerToken& token )
             m_refTimeGpu = refGpu;
         }
     );
+#endif
     if( connectionLost ) return DequeueStatus::ConnectionLost;
     return sz > 0 ? DequeueStatus::DataDequeued : DequeueStatus::QueueEmpty;
 }
@@ -2802,6 +3420,36 @@ Profiler::DequeueStatus Profiler::DequeueContextSwitches( tracy::moodycamel::Con
 
 Profiler::DequeueStatus Profiler::DequeueSerial()
 {
+#ifdef TRACY_BYTESTREAM_QUEUE
+    // Note: We can't take m_serialLock from this thread, because a producer
+    // may be holding the lock and blocking on us dequeueing data. Waiting
+    // for the lock here would deadlock in that case.
+    size_t sz = 0;
+
+    auto& bs = m_serialStream;
+    if (bs.consumer_estimate_used_size() != 0)
+    {
+        QueueItem item;
+        MemWrite( &item.hdr.type, QueueType::ThreadContext );
+        #error "TODO RP2350 handle initial thread ID when using serial queue"
+        MemWrite( &item.threadCtx.thread, TODO );
+        if( !AppendData( &item, QueueDataSize[(int)QueueType::ThreadContext] ) )
+        {
+            connectionLost = true;
+        }
+
+        sz = bs.consume_data(
+            [this, &connectionLost] ( void *ptr, size_t len )
+            {
+                if (connectionLost) return;
+                if (!AppendData( ptr, len )) connectionLost = true;
+            });
+    }
+
+    return connectionLost ? DequeueStatus::ConnectionLost
+                : sz == 0 ? DequeueStatus::QueueEmpty
+                          : DequeueStatus::DataDequeued;
+#else
     {
         bool lockHeld = true;
         while( !m_serialLock.try_lock() )
@@ -3136,6 +3784,7 @@ Profiler::DequeueStatus Profiler::DequeueSerial()
         m_serialDequeue.clear();
     }
     return dequeueStatus;
+#endif
 }
 
 Profiler::ThreadCtxStatus Profiler::ThreadCtxCheck( uint32_t threadId )
@@ -4243,6 +4892,13 @@ int64_t Profiler::GetTimeQpc()
 extern "C" {
 #endif
 
+#ifdef TRACY_NO_THREADS
+TRACY_API void ___tracy_poll()
+{
+    tracy::GetProfiler().PollWorker();
+}
+#endif
+
 TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin( const struct ___tracy_source_location_data* srcloc, int32_t active )
 {
     ___tracy_c_zone_context ctx;
@@ -4291,6 +4947,9 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_callstack( const struct ___trac
     return ctx;
 }
 
+// TODO RP2350 This is an inefficient API as it forces srcloc to be externally one-shot allocated.
+// If srcloc members are passed here, it can be written directly into the ring buffer
+// without any need for malloc.
 TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_alloc( uint64_t srcloc, int32_t active )
 {
     ___tracy_c_zone_context ctx;
@@ -4529,6 +5188,7 @@ TRACY_API void ___tracy_emit_gpu_zone_begin_callstack( const struct ___tracy_gpu
     TracyLfqCommitC;
 }
 
+// TODO RP2350 inline alloc
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc( const struct ___tracy_gpu_zone_begin_data data )
 {
     TracyLfqBeginC;

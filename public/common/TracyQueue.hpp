@@ -17,13 +17,13 @@ enum class QueueType : uint8_t
     MessageColorCallstack,
     MessageAppInfo,
     ZoneBeginAllocSrcLoc,
-    ZoneBeginAllocSrcLocCallstack,
-    CallstackSerial,
-    Callstack,
-    CallstackAlloc,
-    CallstackSample,
-    CallstackSampleContextSwitch,
-    FrameImage,
+    ZoneBeginAllocSrcLocCallstack, // TODO lua callstack
+    CallstackSerial, // TODO callstack
+    Callstack, // TODO callstack
+    CallstackAlloc, // TODO lua callstack
+    CallstackSample, // TODO callstack64
+    CallstackSampleContextSwitch, // TODO callstack64
+    FrameImage, // TODO frameimage
     ZoneBegin,
     ZoneBeginCallstack,
     ZoneEnd,
@@ -57,21 +57,21 @@ enum class QueueType : uint8_t
     PlotDataInt,
     PlotDataFloat,
     PlotDataDouble,
-    ContextSwitch,
+    ContextSwitch, // TODO DequeueContextSwitches
     ThreadWakeup,
     GpuTime,
     GpuContextName,
     GpuAnnotationName,
-    CallstackFrameSize,
-    SymbolInformation,
-    ExternalNameMetadata,
-    SymbolCodeMetadata,
-    SourceCodeMetadata,
+    CallstackFrameSize, // TODO SymbolWorker
+    SymbolInformation, // TODO SymbolWorker
+    ExternalNameMetadata, // TODO SymbolWorker (not networked)
+    SymbolCodeMetadata, // TODO SymbolWorker (not networked)
+    SourceCodeMetadata, // TODO SymbolWorker (not networked)
     FiberEnter,
     FiberLeave,
     Terminate,
     KeepAlive,
-    ThreadContext,
+    ThreadContext, // TODO need to emit one for DequeueSerial in bytestream mode
     GpuCalibration,
     GpuTimeSync,
     Crash,
@@ -92,7 +92,7 @@ enum class QueueType : uint8_t
     MessageLiteralCallstack,
     MessageLiteralColorCallstack,
     GpuNewContext,
-    CallstackFrame,
+    CallstackFrame, // TODO SymbolWorker
     SysTimeReport,
     SysPowerReport,
     TidToPid,
@@ -104,12 +104,12 @@ enum class QueueType : uint8_t
     HwSampleBranchMiss,
     PlotConfig,
     ParamSetup,
-    AckServerQueryNoop,
-    AckSourceCodeNotAvailable,
-    AckSymbolCodeNotAvailable,
+    AckServerQueryNoop, // TODO SymbolWorker
+    AckSourceCodeNotAvailable, // TODO SymbolWorker
+    AckSymbolCodeNotAvailable, // TODO SymbolWorker
     CpuTopology,
     SingleStringData,
-    SecondStringData,
+    SecondStringData, // TODO SymbolWorker
     MemNamePayload,
     ThreadGroupHint,
     GpuZoneAnnotation,
@@ -117,14 +117,14 @@ enum class QueueType : uint8_t
     ThreadName,
     PlotName,
     SourceLocationPayload,
-    CallstackPayload,
-    CallstackAllocPayload,
+    CallstackPayload, // TODO callstack
+    CallstackAllocPayload, // TODO lua callstack
     FrameName,
-    FrameImageData,
-    ExternalName,
-    ExternalThreadName,
-    SymbolCode,
-    SourceCode,
+    FrameImageData, // TODO frameimage
+    ExternalName, // TODO SymbolWorker
+    ExternalThreadName, // TODO SymbolWorker
+    SymbolCode, // TODO SymbolWorker
+    SourceCode, // TODO SymbolWorker
     FiberName,
     NUM_TYPES
 };

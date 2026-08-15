@@ -1,6 +1,25 @@
 #ifndef __TRACYTHREAD_HPP__
 #define __TRACYTHREAD_HPP__
 
+#ifdef TRACY_NO_THREADS
+
+namespace tracy
+{
+
+class ThreadExitHandler
+{
+public:
+    ~ThreadExitHandler() { }
+};
+
+class Thread
+{
+};
+
+}
+
+#else
+
 #if defined _WIN32
 #  include <windows.h>
 #else
@@ -90,5 +109,7 @@ private:
 #endif
 
 }
+
+#endif
 
 #endif

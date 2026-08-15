@@ -25,7 +25,11 @@
 #include "client/TracySysPower.cpp"
 #include "client/TracySysTime.cpp"
 #include "client/TracySysTrace.cpp"
+#ifdef TRACY_RP2350
+#include "common/TracySocketRTT.cpp"
+#else
 #include "common/TracySocket.cpp"
+#endif
 #ifndef TRACY_HAS_CUSTOM_ALLOCATOR
 #include "client/tracy_rpmalloc.cpp"
 #endif

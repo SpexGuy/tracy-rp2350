@@ -155,6 +155,8 @@ static inline void LuaShortenSrc( char* dst, const char* src )
 #ifdef TRACY_HAS_CALLSTACK
 static tracy_force_inline void SendLuaCallstack( lua_State* L, uint32_t depth )
 {
+    #error "RP2350 Lua Callstack"
+
     assert( depth <= 64 );
     lua_Debug dbg[64];
     const char* func[64];

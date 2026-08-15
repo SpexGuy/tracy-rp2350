@@ -120,6 +120,104 @@ struct LuaZoneState
 };
 #endif
 
+#ifdef TRACY_BYTESTREAM_QUEUE
+
+#define _TracyBytestreamLfqBegin \
+    auto __writer = s_bytestream.writer(); \
+    __writer.allow_thread_time();
+
+#define _TracyBytestreamLfqCommit \
+    __writer.commit();
+
+#define _TracyBytestreamSerialBegin \
+    auto __writer = tracy::Profiler::BeginSerialBytestream();
+
+#define _TracyBytestreamSerialCommit \
+    tracy::Profiler::CommitSerialBytestream( __writer, tracy::GetThreadHandle() );
+
+#define _TracyBytestreamSerialUseThreadContext \
+    tracy::SerialBytestreamCheckThread( __writer );
+
+#define _TracyBytestreamSingleString( _ptr, _len ) \
+    auto __l16 = uint16_t(_len); \
+    __writer.reserve_space_blocking( QueueDataSize[(int)QueueType::SingleStringData] + sizeof(__l16) + __l16 ); \
+    tracy::MemWrite( __writer.write_ptr<QueueType>(), QueueType::SingleStringData ); \
+    tracy::MemWrite( __writer.write_ptr<uint16_t>(), __l16 ); \
+    memcpy( __writer.write_ptr_bytes<char>(__l16), _ptr, __l16 );
+
+#define _TracyBytestreamSingleStringLenNT( _ptr, _len ) \
+    auto __l16 = uint16_t(_len); \
+    __writer.reserve_space_blocking( QueueDataSize[(int)QueueType::SingleStringData] + sizeof(__l16) + __l16 + 1); \
+    __writer.backoff_reservation(1); /* Don't force the null to be consumed */ \
+    tracy::MemWrite( __writer.write_ptr<QueueType>(), QueueType::SingleStringData ); \
+    tracy::MemWrite( __writer.write_ptr<uint16_t>(), __l16 ); \
+    auto _ptr = __writer.write_ptr_bytes<char>(__l16); \
+    _len = __l16;
+
+#define _TracyBytestreamSrcLoc( _srcloc ) \
+    auto __srcloc_ptr = (const char*)(_srcloc); \
+    uint16_t __srcloc_len = MemRead<uint16_t>( __srcloc_ptr ); \
+    __writer.reserve_space_blocking( QueueDataSize[(int)QueueType::SourceLocationPayload] + __srcloc_len ); \
+    tracy::MemWrite( __writer.write_ptr<QueueType>(), QueueType::SourceLocationPayload ); \
+    tracy::MemWrite( __writer.write_ptr<uint64_t>(), uint64_t( _srcloc ) ); \
+    memcpy( __writer.write_ptr_bytes<char>( __srcloc_len ), __srcloc_ptr, __srcloc_len ); \
+    tracy::tracy_free(__srcloc_ptr);
+
+#define _TracyBytestreamSrcLocUnfilled( _srcloc, _size ) \
+    uint16_t __srcloc_len = uint16_t( _size ); \
+    __writer.reserve_space_blocking( QueueDataSize[(int)QueueType::SourceLocationPayload] + __srcloc_len ); \
+    tracy::MemWrite( __writer.write_ptr<QueueType>(), QueueType::SourceLocationPayload ); \
+    uint64_t *__ptr_ptr = __writer.write_ptr<uint64_t>(); \
+    uint64_t _srcloc = uint64_t(__writer.write_ptr_bytes<char>( __srcloc_len )); \
+    tracy::MemWrite( __ptr_ptr, _srcloc );
+
+#define _TracyBytestreamItem( _type ) \
+    __writer.reserve_space_blocking( QueueDataSize[(int)_type] ); \
+    QueueItem* const item = __writer.write_ptr_bytes<QueueItem>( QueueDataSize[(int)_type] ); \
+    tracy::MemWrite( &item->hdr.type, _type );
+
+// TODO RP2350 Bytestream<> might not be right, typedef the used defaults
+#define _TracyBytestreamThreadTime( _ptr, _time ) \
+    __writer.MemWriteThreadTime( _ptr, _time );
+
+#define TracyLfqBegin _TracyBytestreamLfqBegin
+#define TracyLfqBeginC _TracyBytestreamLfqBegin
+#define TracyLfqSingleString( _ptr, _len ) _TracyBytestreamSingleString( _ptr, _len )
+#define TracyLfqSingleStringC( _ptr, _len ) _TracyBytestreamSingleString( _ptr, _len )
+#define TracyLfqSingleStringLenNT( _ptr, _len ) _TracyBytestreamSingleStringLenNT( _ptr, _len )
+#define TracyLfqSingleStringLenNTC( _ptr, _len ) _TracyBytestreamSingleStringLenNT( _ptr, _len )
+#define TracyLfqSrcLoc( _srcloc ) _TracyBytestreamSrcLoc( _srcloc )
+#define TracyLfqSrcLocC( _srcloc ) _TracyBytestreamSrcLoc( _srcloc )
+#define TracyLfqSrcLocUnfilled( _srcloc, _size ) _TracyBytestreamSrcLocUnfilled( _srcloc, _size )
+#define TracyLfqItem( _type ) _TracyBytestreamItem( _type )
+#define TracyLfqItemC( _type ) _TracyBytestreamItem( _type )
+#define TracyLfqFat( _ptr, _value )
+#define TracyLfqFatC( _ptr, _value )
+#define TracyLfqThreadTime( _ptr, _time ) _TracyBytestreamThreadTime( _ptr, _time )
+#define TracyLfqThreadTimeC( _ptr, _time ) _TracyBytestreamThreadTime( _ptr, _time )
+#define TracyLfqCommit _TracyBytestreamLfqCommit
+#define TracyLfqCommitC _TracyBytestreamLfqCommit
+
+#define TracySerialBegin _TracyBytestreamSerialBegin
+#define TracySerialUseThreadContext _TracyBytestreamSerialUseThreadContext
+#define TracySerialSingleString( _ptr, _len ) _TracyBytestreamSingleString( _ptr, _len )
+#define TracySerialSingleStringLenNT( _ptr, _len ) _TracyBytestreamSingleStringLenNT( _ptr, _len )
+#define TracySerialSrcLoc( _srcloc ) _TracyBytestreamSrcLoc( _srcloc )
+#define TracySerialSrcLocUnfilled( _srcloc, _size ) _TracyBytestreamSrcLocUnfilled( _srcloc, _size )
+#define TracySerialItem( _type ) _TracyBytestreamItem( _type )
+#define TracySerialFat( _ptr, _value )
+#define TracySerialThreadTime( _ptr, _time ) _TracyBytestreamThreadTime( _ptr, _time )
+#define TracySerialCommit _TracyBytestreamSerialCommit
+
+#define TracySerialTime( _ptr, _value ) \
+    /* This is protected by the serial lock so no atomic needed */ \
+    int64_t __val_freeze = _value; \
+    auto& __refSerial = tracy::GetProfiler().m_refTimeSerial; \
+    auto __delta = __val_freeze - __refSerial; \
+    __refSerial = __val_freeze; \
+    tracy::MemWrite( _ptr, __val_freeze );
+
+#else
 
 #define TracyLfqBegin \
     tracy::moodycamel::ConcurrentQueueDefaultTraits::index_t __magic; \
@@ -224,6 +322,7 @@ struct LuaZoneState
     _TracyDefer; \
     TracyQueueCommit;
 
+#endif
 
 #ifdef TRACY_FIBERS
 
@@ -477,6 +576,39 @@ public:
         return m_zoneId.fetch_add( 1, std::memory_order_relaxed );
     }
 
+#ifdef TRACY_BYTESTREAM_QUEUE
+
+    static tracy_force_inline BytestreamQueue::WriteContext BeginSerialBytestream()
+    {
+        auto& p = GetProfiler();
+        p.m_serialLock.lock();
+        return p.m_serialStream.writer();
+    }
+
+    static tracy_force_inline void SerialBytestreamCheckThread( BytestreamQueue::WriteContext& __writer )
+    {
+        __writer.allow_thread_time();
+        auto threadId = tracy::GetThreadHandle();
+        auto& p = GetProfiler();
+        if (p.m_serialStream.m_threadId != threadId)
+        {
+            QueueItem *item;
+            _TracyBytestreamItem( QueueType::ThreadContext );
+            MemWrite( &item.threadCtx.thread, threadId );
+            p.m_serialStream.m_threadRefTime = 0;
+            p.m_serialStream.m_threadId = threadId;
+        }
+    }
+
+    static tracy_force_inline void CommitSerialBytestream( BytestreamQueue::WriteContext __writer )
+    {
+        writer.commit();
+        auto& p = GetProfiler();
+        p.m_serialLock.unlock();
+    }
+
+#else
+
     static tracy_force_inline QueueItem* QueueSerial( QueueItem* prev_item = nullptr )
     {
         auto& p = GetProfiler();
@@ -495,6 +627,8 @@ public:
         p.m_serialQueue.commit_next();
         p.m_serialLock.unlock();
     }
+
+#endif
 
     static tracy_force_inline void SendFrameMark( const char* name )
     {
@@ -991,6 +1125,11 @@ public:
         }
     }
 
+
+#ifdef TRACY_NO_THREADS
+    void PollWorker(); // Polling implementation of Worker() if no threads
+#endif
+
 private:
     enum class DequeueStatus { DataDequeued, ConnectionLost, QueueEmpty };
     enum class ThreadCtxStatus { Same, Changed, ConnectionLost };
@@ -1133,7 +1272,53 @@ private:
 
     char* m_lz4Buf;
 
+#ifdef TRACY_NO_THREADS
+    enum class PollState {
+        Startup,
+        WaitForTimeBegin,
+        Initialize,
+        WaitForConnection,
+        NewConnection,
+    #ifdef TRACY_HAS_CALLSTACK
+        WaitForSymbols,
+        NewConnectionHasSymbols,
+    #endif
+        Connected,
+        PostConnected,
+    #ifndef TRACY_ON_DEMAND
+        RejectConnections,
+    #endif
+        ShuttingDown,
+    #ifdef TRACY_HAS_CALLSTACK
+        WaitForSymbolThreadGone
+        ShutdownAfterSymbolThread
+    #endif
+        NotListeningLoop,
+        Terminate,
+        PostTerminated,
+    };
+    PollState m_pollState = PollState::Startup;
+
+    // Union wrap prevents initialization
+    // Be sure to initialize before use!
+    std::optional<moodycamel::ConsumerToken> m_token;
+    std::optional<ListenSocket> m_listen;
+
+    int m_keepAlive = 0;
+
+    WelcomeMessage m_welcome;
+
+    BroadcastMessage m_broadcastMsg;
+    int16_t m_broadcastPort;
+    int m_broadcastLen;
+    uint64_t m_lastBroadcast;
+#endif
+
+#ifdef TRACY_BYTESTREAM_QUEUE
+    BytestreamQueue m_serialStream;
+#else
     FastVector<QueueItem> m_serialQueue, m_serialDequeue;
+#endif
     TracyMutex m_serialLock;
 
 #ifndef TRACY_NO_FRAME_IMAGE
@@ -1142,6 +1327,8 @@ private:
 #endif
 
     SPSCQueue<SymbolQueueItem> m_symbolQueue;
+    TracyConditionVariable m_symbolQueueSignal;
+    TracyMutex m_symbolQueueMutex;
 
     std::atomic<uint64_t> m_frameCount;
     std::atomic<bool> m_isConnected;
