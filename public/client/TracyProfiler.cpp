@@ -4255,15 +4255,10 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin( const struct ___tracy_source_l
     const auto id = tracy::GetProfiler().GetNextZoneId();
     ctx.id = id;
 
-#ifndef TRACY_NO_VERIFY
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneBegin );
+        TracyQueueBeginC;
+        TracyQueueZoneValidationC( id );
+        TracyQueueItemC( tracy::QueueType::ZoneBegin );
         tracy::MemWrite( &item->zoneBegin.time, tracy::Profiler::GetTime() );
         tracy::MemWrite( &item->zoneBegin.srcloc, (uint64_t)srcloc );
         TracyQueueCommitC( zoneBeginThread );
@@ -4283,16 +4278,10 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_callstack( const struct ___trac
     const auto id = tracy::GetProfiler().GetNextZoneId();
     ctx.id = id;
 
-#ifndef TRACY_NO_VERIFY
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
     TracyQueuePrepCallstack( depth, zoneQueue, tracy::QueueType::ZoneBegin, tracy::QueueType::ZoneBeginCallstack );
 
     TracyQueueBeginC;
+    TracyQueueZoneValidationC( id );
     TracyQueueCallstack;
     TracyQueueItemC( zoneQueue );
     tracy::MemWrite( &item->zoneBegin.time, tracy::Profiler::GetTime() );
@@ -4318,15 +4307,9 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_alloc( uint64_t srcloc, int32_t
     const auto id = tracy::GetProfiler().GetNextZoneId();
     ctx.id = id;
 
-#ifndef TRACY_NO_VERIFY
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
     {
         TracyQueueBeginC;
+        TracyQueueZoneValidationC( id );
         TracyQueueSrcLocC( srcloc );
         TracyQueueItemC( tracy::QueueType::ZoneBeginAllocSrcLoc );
         tracy::MemWrite( &item->zoneBegin.time, tracy::Profiler::GetTime() );
@@ -4352,16 +4335,10 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_alloc_callstack( uint64_t srclo
     const auto id = tracy::GetProfiler().GetNextZoneId();
     ctx.id = id;
 
-#ifndef TRACY_NO_VERIFY
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
     TracyQueuePrepCallstack( depth, zoneQueue, tracy::QueueType::ZoneBeginAllocSrcLoc, tracy::QueueType::ZoneBeginAllocSrcLocCallstack );
 
     TracyQueueBeginC;
+    TracyQueueZoneValidationC( id );
     TracyQueueCallstack;
     TracyQueueSrcLocC( srcloc );
     TracyQueueItemC( zoneQueue );
@@ -4375,15 +4352,11 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_alloc_callstack( uint64_t srclo
 TRACY_API void ___tracy_emit_zone_end( TracyCZoneCtx ctx )
 {
     if( !ctx.active ) return;
-#ifndef TRACY_NO_VERIFY
+
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, ctx.id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneEnd );
+        TracyQueueBeginC;
+        TracyQueueZoneValidationC( ctx.id );
+        TracyQueueItemC( tracy::QueueType::ZoneEnd );
         tracy::MemWrite( &item->zoneEnd.time, tracy::Profiler::GetTime() );
         TracyQueueCommitC( zoneEndThread );
     }
@@ -4393,15 +4366,10 @@ TRACY_API void ___tracy_emit_zone_text( TracyCZoneCtx ctx, const char* txt, size
 {
     assert( size < std::numeric_limits<uint16_t>::max() );
     if( !ctx.active ) return;
-#ifndef TRACY_NO_VERIFY
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, ctx.id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
+
     {
         TracyQueueBeginC;
+        TracyQueueZoneValidationC( ctx.id );
         TracyQueueSingleStringC( txt, size );
         TracyQueueItemC( tracy::QueueType::ZoneText );
         TracyQueueFatC( &item->zoneTextFat.text, (uint64_t)txt );
@@ -4414,15 +4382,10 @@ TRACY_API void ___tracy_emit_zone_name( TracyCZoneCtx ctx, const char* txt, size
 {
     assert( size < std::numeric_limits<uint16_t>::max() );
     if( !ctx.active ) return;
-#ifndef TRACY_NO_VERIFY
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, ctx.id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
+
     {
         TracyQueueBeginC;
+        TracyQueueZoneValidationC( ctx.id );
         TracyQueueSingleStringC( txt, size );
         TracyQueueItemC( tracy::QueueType::ZoneName );
         TracyQueueFatC( &item->zoneTextFat.text, (uint64_t)txt );
@@ -4433,15 +4396,11 @@ TRACY_API void ___tracy_emit_zone_name( TracyCZoneCtx ctx, const char* txt, size
 
 TRACY_API void ___tracy_emit_zone_color( TracyCZoneCtx ctx, uint32_t color ) {
     if( !ctx.active ) return;
-#ifndef TRACY_NO_VERIFY
+
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, ctx.id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneColor );
+        TracyQueueBeginC;
+        TracyQueueZoneValidationC( ctx.id );
+        TracyQueueItemC( tracy::QueueType::ZoneColor );
         tracy::MemWrite( &item->zoneColor.b, uint8_t( ( color       ) & 0xFF ) );
         tracy::MemWrite( &item->zoneColor.g, uint8_t( ( color >> 8  ) & 0xFF ) );
         tracy::MemWrite( &item->zoneColor.r, uint8_t( ( color >> 16 ) & 0xFF ) );
@@ -4452,15 +4411,11 @@ TRACY_API void ___tracy_emit_zone_color( TracyCZoneCtx ctx, uint32_t color ) {
 TRACY_API void ___tracy_emit_zone_value( TracyCZoneCtx ctx, uint64_t value )
 {
     if( !ctx.active ) return;
-#ifndef TRACY_NO_VERIFY
+
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValidation );
-        tracy::MemWrite( &item->zoneValidation.id, ctx.id );
-        TracyQueueCommitC( zoneValidationThread );
-    }
-#endif
-    {
-        TracyQueuePrepareC( tracy::QueueType::ZoneValue );
+        TracyQueueBeginC;
+        TracyQueueZoneValidationC( ctx.id );
+        TracyQueueItemC( tracy::QueueType::ZoneValue );
         tracy::MemWrite( &item->zoneValue.value, value );
         TracyQueueCommitC( zoneValueThread );
     }

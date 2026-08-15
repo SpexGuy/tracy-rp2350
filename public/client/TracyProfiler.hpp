@@ -237,6 +237,20 @@ struct LuaZoneState
     TracyQueueThreadCtx( _name ); \
     TracySerialCommit;
 
+#  ifndef TRACY_NO_VERIFY
+#    define TracyQueueZoneValidation( _id ) \
+    TracySerialItem( tracy::QueueType::ZoneValidation ); \
+    tracy::MemWrite( &item->zoneValidation.id, uint32_t( _id ) ); \
+    TracySerialFat( &item->zoneValidationThread.thread, tracy::GetThreadHandle() );
+#    define TracyQueueZoneValidationC( _id ) \
+    TracySerialItem( tracy::QueueType::ZoneValidation ); \
+    tracy::MemWrite( &item->zoneValidation.id, uint32_t( _id ) ); \
+    TracySerialFat( &item->zoneValidationThread.thread, tracy::GetThreadHandle() );
+#  else
+#    define TracyQueueZoneValidation( _id )
+#    define TracyQueueZoneValidationC( _id )
+#  endif
+
 #else
 
 #  define TracyQueueBegin TracyLfqBegin
@@ -254,6 +268,18 @@ struct LuaZoneState
 #  define TracyQueueItemC( _type ) TracyLfqItemC( _type )
 #  define TracyQueueFatC( _ptr, _value ) TracyLfqFatC( _ptr, _value )
 #  define TracyQueueCommitC( _name ) TracyLfqCommitC
+
+#  ifndef TRACY_NO_VERIFY
+#  define TracyQueueZoneValidation( _id ) \
+    TracyLfqItem( tracy::QueueType::ZoneValidation ); \
+    tracy::MemWrite( &item->zoneValidation.id, uint32_t( _id ) );
+#  define TracyQueueZoneValidationC( _id ) \
+    TracyLfqItemC( tracy::QueueType::ZoneValidation ); \
+    tracy::MemWrite( &item->zoneValidation.id, uint32_t( _id ) );
+#  else
+#    define TracyQueueZoneValidation( _id )
+#    define TracyQueueZoneValidationC( _id )
+#  endif
 
 #endif
 
