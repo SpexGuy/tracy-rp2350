@@ -4336,9 +4336,11 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_alloc( uint64_t srcloc, int32_t
     }
 #endif
     {
-        TracyQueuePrepareC( tracy::QueueType::ZoneBeginAllocSrcLoc );
+        TracyQueueBeginC;
+        TracyQueueSrcLocC( srcloc );
+        TracyQueueItemC( tracy::QueueType::ZoneBeginAllocSrcLoc );
         tracy::MemWrite( &item->zoneBegin.time, tracy::Profiler::GetTime() );
-        tracy::MemWrite( &item->zoneBegin.srcloc, srcloc );
+        TracyQueueFatC( &item->zoneBegin.srcloc, srcloc );
         TracyQueueCommitC( zoneBeginThread );
     }
     return ctx;
@@ -4373,9 +4375,11 @@ TRACY_API TracyCZoneCtx ___tracy_emit_zone_begin_alloc_callstack( uint64_t srclo
         tracy::GetProfiler().SendCallstack( depth );
         zoneQueue = tracy::QueueType::ZoneBeginAllocSrcLocCallstack;
     }
-    TracyQueuePrepareC( zoneQueue );
+    TracyQueueBeginC;
+    TracyQueueSrcLocC( srcloc );
+    TracyQueueItemC( zoneQueue );
     tracy::MemWrite( &item->zoneBegin.time, tracy::Profiler::GetTime() );
-    tracy::MemWrite( &item->zoneBegin.srcloc, srcloc );
+    TracyQueueFatC( &item->zoneBegin.srcloc, srcloc );
     TracyQueueCommitC( zoneBeginThread );
 
     return ctx;
@@ -4582,10 +4586,12 @@ TRACY_API void ___tracy_emit_gpu_zone_begin_callstack( const struct ___tracy_gpu
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc( const struct ___tracy_gpu_zone_begin_data data )
 {
-    TracyLfqPrepareC( tracy::QueueType::GpuZoneBeginAllocSrcLoc  );
+    TracyLfqBeginC;
+    TracyLfqSrcLocC( data.srcloc );
+    TracyLfqItemC( tracy::QueueType::GpuZoneBeginAllocSrcLoc  );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
-    tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
+    TracyLfqFatC( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
     TracyLfqCommitC;
@@ -4594,10 +4600,12 @@ TRACY_API void ___tracy_emit_gpu_zone_begin_alloc( const struct ___tracy_gpu_zon
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc_callstack( const struct ___tracy_gpu_zone_begin_callstack_data data )
 {
     tracy::GetProfiler().SendCallstack( data.depth );
-    TracyLfqPrepareC( tracy::QueueType::GpuZoneBeginAllocSrcLocCallstack  );
+    TracyLfqBeginC;
+    TracyLfqSrcLocC( data.srcloc );
+    TracyLfqItemC( tracy::QueueType::GpuZoneBeginAllocSrcLocCallstack );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
-    tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
+    TracyLfqFatC( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
     TracyLfqCommitC;
@@ -4691,10 +4699,12 @@ TRACY_API void ___tracy_emit_gpu_zone_begin_callstack_serial( const struct ___tr
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc_serial( const struct ___tracy_gpu_zone_begin_data data )
 {
-    TracySerialPrepare( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
+    TracySerialBegin;
+    TracySerialSrcLoc( srcloc );
+    TracySerialItem( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
-    tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
+    TracySerialFat( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
     TracySerialCommit;
@@ -4702,10 +4712,14 @@ TRACY_API void ___tracy_emit_gpu_zone_begin_alloc_serial( const struct ___tracy_
 
 TRACY_API void ___tracy_emit_gpu_zone_begin_alloc_callstack_serial( const struct ___tracy_gpu_zone_begin_callstack_data data )
 {
-    TracySerialPrepareCallstack( tracy::QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, tracy::Callstack( data.depth ) );
+    auto callstack = tracy::Callstack( data.depth );
+
+    TracySerialBegin;
+    TracySerialSrcLoc( srcloc );
+    TracySerialItemCallstack( tracy::QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, callstack );
     tracy::MemWrite( &item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime() );
     tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
-    tracy::MemWrite( &item->gpuZoneBegin.srcloc, data.srcloc );
+    TracySerialFat( &item->gpuZoneBegin.srcloc, data.srcloc );
     tracy::MemWrite( &item->gpuZoneBegin.queryId, data.queryId );
     tracy::MemWrite( &item->gpuZoneBegin.context, data.context );
     TracySerialCommit;

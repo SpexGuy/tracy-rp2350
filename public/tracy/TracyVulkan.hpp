@@ -570,10 +570,14 @@ public:
         const auto queryId = ctx->NextQueryId();
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->m_query, queryId ) );
 
-        const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-        TracySerialPrepare( QueueType::GpuZoneBeginAllocSrcLocSerial );
+        const auto srcloc_sz = Profiler::SourceLocationSize( sourceSz, functionSz, nameSz );
+
+        TracySerialBegin;
+        TracySerialSrcLocUnfilled( srcloc, srcloc_sz );
+        Profiler::FillSourceLocation( srcloc, srcloc_sz, line, source, sourceSz, function, functionSz, name, nameSz );
+        TracySerialItem( QueueType::GpuZoneBeginAllocSrcLocSerial );
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
-        MemWrite( &item->gpuZoneBegin.srcloc, srcloc );
+        TracySerialFat( &item->gpuZoneBegin.srcloc, srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, ctx->GetId() );

@@ -295,8 +295,9 @@ public:
     {
         if( !m_active ) return;
 
-        auto* item = Profiler::QueueSerial();
-        WriteQueueItem(item, QueueType::GpuZoneBeginSerial, reinterpret_cast<uint64_t>(srcloc));
+        TracySerialPrepare( QueueType::GpuZoneBeginSerial );
+        WriteQueueItemStatic(item, reinterpret_cast<uint64_t>(srcloc));
+        TracySerialCommit;
     }
 
     tracy_force_inline D3D11ZoneScope( D3D11Ctx* ctx, const SourceLocationData* srcloc, int32_t depth, bool active )
@@ -306,13 +307,15 @@ public:
 
         if( depth > 0 && has_callstack() )
         {
-            auto* item = Profiler::QueueSerialCallstack(Callstack(depth));
-            WriteQueueItem(item, QueueType::GpuZoneBeginCallstackSerial, reinterpret_cast<uint64_t>(srcloc));
+            TracySerialPrepareCallstack(QueueType::GpuZoneBeginCallstackSerial, Callstack(depth));
+            WriteQueueItemStatic(item, reinterpret_cast<uint64_t>(srcloc));
+            TracySerialCommit;
         }
         else
         {
-            auto* item = Profiler::QueueSerial();
-            WriteQueueItem(item, QueueType::GpuZoneBeginSerial, reinterpret_cast<uint64_t>(srcloc));
+            TracySerialPrepare(QueueType::GpuZoneBeginSerial);
+            WriteQueueItemStatic(item, reinterpret_cast<uint64_t>(srcloc));
+            TracySerialCommit;
         }
     }
 
@@ -321,10 +324,14 @@ public:
     {
         if( !m_active ) return;
 
-        const auto sourceLocation = Profiler::AllocSourceLocation(line, source, sourceSz, function, functionSz, name, nameSz);
+        const sz = Profiler::SourceLocationSize(sourceSz, functionSz, nameSz);
 
-        auto* item = Profiler::QueueSerial();
-        WriteQueueItem(item, QueueType::GpuZoneBeginAllocSrcLocSerial, sourceLocation);
+        TracySerialBegin;
+        TracySerialSrcLocUnfilled( sourceLocation, sz );
+        Profiler::FillSourceLocation( sourceLocation, sz, line, source, sourceSz, function, functionSz, name, nameSz );
+        TracySerialItem( QueueType::GpuZoneBeginAllocSrcLocSerial );
+        WriteQueueItemAlloc(item, sourceLocation);
+        TracySerialCommit;
     }
 
     tracy_force_inline D3D11ZoneScope(D3D11Ctx* ctx, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, int32_t depth, bool active)
@@ -332,17 +339,26 @@ public:
     {
         if( !m_active ) return;
 
-        const auto sourceLocation = Profiler::AllocSourceLocation(line, source, sourceSz, function, functionSz, name, nameSz);
+        const sz = Profiler::SourceLocationSize(sourceSz, functionSz, nameSz);
 
         if ( depth > 0 && has_callstack() )
         {
-            auto* item = Profiler::QueueSerialCallstack(Callstack(depth));
-            WriteQueueItem(item, QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, sourceLocation);
+            auto callstack = Callstack(depth);
+            TracySerialBegin;
+            TracySerialSrcLocUnfilled(sourceLocation, sz);
+            Profiler::FillSourceLocation(sourceLocation, sz, line, source, sourceSz, function, functionSz, name, nameSz);
+            TracySerialItemCallstack(QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, callstack);
+            WriteQueueItemAlloc(item, sourceLocation);
+            TracySerialCommit;
         }
         else
         {
-            auto* item = Profiler::QueueSerial();
-            WriteQueueItem(item, QueueType::GpuZoneBeginAllocSrcLocSerial, sourceLocation);
+            TracySerialBegin;
+            TracySerialSrcLocUnfilled(sourceLocation, sz);
+            Profiler::FillSourceLocation(sourceLocation, sz, line, source, sourceSz, function, functionSz, name, nameSz);
+            TracySerialItem(QueueType::GpuZoneBeginAllocSrcLocSerial);
+            WriteQueueItemAlloc(item, sourceLocation);
+            TracySerialCommit;
         }
     }
 
@@ -373,18 +389,28 @@ private:
         m_ctx = ctx;
     }
 
-    void WriteQueueItem(tracy::QueueItem* item, tracy::QueueType queueItemType, uint64_t sourceLocation)
+    void WriteQueueItemStatic(tracy::QueueItem* item, uint64_t sourceLocation)
     {
         const auto queryId = m_ctx->NextQueryId();
         m_ctx->m_immediateDevCtx->End(m_ctx->GetQueryObjectFromId(queryId));
 
-        MemWrite( &item->hdr.type, queueItemType);
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, sourceLocation );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
         MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
         MemWrite( &item->gpuZoneBegin.context, m_ctx->GetContextId() );
-        Profiler::QueueSerialFinish();
+    }
+
+    void WriteQueueItemAlloc(tracy::QueueItem* item, uint64_t sourceLocation)
+    {
+        const auto queryId = m_ctx->NextQueryId();
+        m_ctx->m_immediateDevCtx->End(m_ctx->GetQueryObjectFromId(queryId));
+
+        MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
+        TracySerialFat( &item->gpuZoneBegin.srcloc, sourceLocation );
+        MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
+        MemWrite( &item->gpuZoneBegin.queryId, uint16_t( queryId ) );
+        MemWrite( &item->gpuZoneBegin.context, m_ctx->GetContextId() );
     }
 
     const bool m_active;

@@ -281,10 +281,14 @@ namespace tracy {
 
             m_beginQueryId = ctx->NextQueryId(EventInfo{ nullptr, EventPhase::Begin });
 
-            const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-            TracySerialPrepare( QueueType::GpuZoneBeginAllocSrcLocSerial );
+            const auto srcloc_sz = Profiler::SourceLocationSize(sourceSz, functionSz, nameSz);
+
+            TracySerialBegin;
+            TracySerialSrcLocUnfilled( srcloc, srcloc_sz );
+            Profiler::FillSourceLocation( srcloc, srcloc_sz, line, source, sourceSz, function, functionSz, name, nameSz );
+            TracySerialItem( QueueType::GpuZoneBeginAllocSrcLocSerial );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
-            MemWrite(&item->gpuZoneBegin.srcloc, srcloc);
+            TracySerialFat(&item->gpuZoneBegin.srcloc, srcloc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)m_beginQueryId);
             MemWrite(&item->gpuZoneBegin.context, ctx->GetId());
@@ -304,10 +308,16 @@ namespace tracy {
 
             m_beginQueryId = ctx->NextQueryId(EventInfo{ nullptr, EventPhase::Begin });
 
-            const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-            TracySerialPrepareCallstack( QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, Callstack( depth ) );
+            const auto srcloc_sz = Profiler::SourceLocationSize(sourceSz, functionSz, nameSz);
+    
+            auto callstack = Callstack( depth );
+
+            TracySerialBegin;
+            TracySerialSrcLocUnfilled( srcloc, srcloc_sz );
+            Profiler::FillSourceLocation( srcloc, srcloc_sz, line, source, sourceSz, function, functionSz, name, nameSz );
+            TracySerialItemCallstack( QueueType::GpuZoneBeginAllocSrcLocCallstackSerial, callstack );
             MemWrite(&item->gpuZoneBegin.cpuTime, Profiler::GetTime());
-            MemWrite(&item->gpuZoneBegin.srcloc, srcloc);
+            TracySerialFat(&item->gpuZoneBegin.srcloc, srcloc);
             MemWrite(&item->gpuZoneBegin.thread, GetThreadHandle());
             MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)m_beginQueryId);
             MemWrite(&item->gpuZoneBegin.context, ctx->GetId());

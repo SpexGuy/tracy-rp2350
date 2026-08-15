@@ -69,11 +69,15 @@ public:
             GetProfiler().SendCallstack( depth );
             zoneQueue = QueueType::ZoneBeginAllocSrcLocCallstack;
         }
-        TracyQueuePrepare( zoneQueue );
-        const auto srcloc =
-            Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz, color );
+
+        uint16_t srcloc_len = Profiler::SourceLocationSize( sourceSz, functionSz, nameSz );
+
+        TracyQueueBegin;
+        TracyQueueSrcLocUnfilled( srcloc, srcloc_len );
+        Profiler::FillSourceLocation( srcloc, srcloc_len, line, source, sourceSz, function, functionSz, name, nameSz, color);
+        TracyQueueItem( zoneQueue );
         MemWrite( &item->zoneBegin.time, Profiler::GetTime() );
-        MemWrite( &item->zoneBegin.srcloc, srcloc );
+        TracyQueueFat( &item->zoneBegin.srcloc, srcloc );
         TracyQueueCommit( zoneBeginThread );
     }
 

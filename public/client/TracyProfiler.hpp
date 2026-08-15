@@ -137,6 +137,11 @@ struct LuaZoneState
     assert( _len < std::numeric_limits<uint16_t>::max() ); \
     auto _ptr = (char*)tracy::tracy_malloc( _len + 1 );
 
+#define TracyLfqSrcLoc( _srcloc )
+
+#define TracyLfqSrcLocUnfilled( _srcloc, _size ) \
+    uint64_t _srcloc = uint64_t( tracy::tracy_malloc(_size) );
+
 #define TracyLfqItem( _type ) \
     if (item) { __tail.store( __magic + 1, std::memory_order_release ); } \
     item = __token->enqueue_begin( __magic ); \
@@ -152,6 +157,8 @@ struct LuaZoneState
 #define TracyLfqBeginC TracyLfqBegin
 #define TracyLfqSingleStringC( _ptr, _len ) TracyLfqSingleString( _ptr, _len )
 #define TracyLfqSingleStringLenNTC( _ptr, _len ) TracyLfqSingleStringLenNT( _ptr, _len )
+#define TracyLfqSrcLocC( _srcloc ) TracyLfqSrcLoc( _srcloc )
+#define TracyLfqSrcLocUnfilledC( _srcloc, _size ) TracyLfqSrcLocUnfilled( _srcloc, _size )
 #define TracyLfqItemC( _type ) TracyLfqItem( _type )
 #define TracyLfqFatC( _ptr, _value ) TracyLfqFat( _ptr, _value )
 #define TracyLfqCommitC TracyLfqCommit
@@ -207,6 +214,8 @@ struct LuaZoneState
     TracySerialBegin;
 #  define TracyQueueSingleString( _ptr, _len ) TracySerialSingleString( _ptr, _len )
 #  define TracyQueueSingleStringLenNT( _ptr, _len ) TracySerialSingleStringLenNT( _ptr, _len )
+#  define TracyQueueSrcLoc( _srcloc ) TracySerialSrcLoc( _srcloc )
+#  define TracyQueueSrcLocUnfilled( _srcloc, _size ) TracySerialSrcLocUnfilled( _srcloc, _size )
 #  define TracyQueueItem( _type ) TracySerialItem( _type )
 #  define TracyQueueFat( _ptr, _value ) TracySerialFat( _ptr, _value )
 #  define TracyQueueCommit( _name ) \
@@ -216,6 +225,7 @@ struct LuaZoneState
 #  define TracyQueueBeginC \
     TracySerialBegin;
 #  define TracyQueueSingleStringC( _ptr, _len ) TracySerialSingleString( _ptr, _len )
+#  define TracyQueueSrcLocC( _srcloc ) TracySerialSrcLoc( _srcloc )
 #  define TracyQueueItemC( _type ) TracySerialItem( _type )
 #  define TracyQueueFatC( _ptr, _value ) TracySerialFat( _ptr, _value )
 #  define TracyQueueCommitC( _name ) \
@@ -227,11 +237,14 @@ struct LuaZoneState
 #  define TracyQueueBegin TracyLfqBegin
 #  define TracyQueueSingleString( _ptr, _len ) TracyLfqSingleString( _ptr, _len )
 #  define TracyQueueSingleStringLenNT( _ptr, _len ) TracyLfqSingleStringLenNT( _ptr, _len )
+#  define TracyQueueSrcLoc( _srcloc ) TracyLfqSrcLoc( _srcloc )
+#  define TracyQueueSrcLocUnfilled( _srcloc, _size ) TracyLfqSrcLocUnfilled( _srcloc, _size )
 #  define TracyQueueItem( _type ) TracyLfqItem( _type )
 #  define TracyQueueFat( _ptr, _value ) TracyLfqFat( _ptr, _value )
 #  define TracyQueueCommit( _name ) TracyLfqCommit
 #  define TracyQueueBeginC TracyLfqBeginC
 #  define TracyQueueSingleStringC( _ptr, _len ) TracyLfqSingleStringC( _ptr, _len )
+#  define TracyQueueSrcLocC( _srcloc ) TracyLfqSrcLocC( _srcloc )
 #  define TracyQueueItemC( _type ) TracyLfqItemC( _type )
 #  define TracyQueueFatC( _ptr, _value ) TracyLfqFatC( _ptr, _value )
 #  define TracyQueueCommitC( _name ) TracyLfqCommitC
@@ -898,10 +911,22 @@ public:
 
     static tracy_force_inline uint64_t AllocSourceLocation( uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, uint32_t color = 0 )
     {
+        const auto sz = SourceLocationSize(sourceSz, functionSz, nameSz);
+        auto ptr = (uint64_t)tracy_malloc( sz );
+        FillSourceLocation(ptr, sz, line, source, sourceSz, function, functionSz, name, nameSz, color);
+        return ptr;
+    }
+
+    static tracy_force_inline uint16_t SourceLocationSize( size_t sourceSz, size_t functionSz, size_t nameSz )
+    {
         const auto sz32 = uint32_t( 2 + 4 + 4 + functionSz + 1 + sourceSz + 1 + nameSz );
         assert( sz32 <= (std::numeric_limits<uint16_t>::max)() );
-        const auto sz = uint16_t( sz32 );
-        auto ptr = (char*)tracy_malloc( sz );
+        return uint16_t( sz32 );
+    }
+
+    static tracy_force_inline void FillSourceLocation( uint64_t _ptr, uint16_t sz, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, uint32_t color = 0 )
+    {
+        auto ptr = (char*)_ptr;
         memcpy( ptr, &sz, 2 );
         memcpy( ptr + 2, &color, 4 );
         memcpy( ptr + 6, &line, 4 );
@@ -913,7 +938,6 @@ public:
         {
             memcpy( ptr + 10 + functionSz + 1 + sourceSz + 1, name, nameSz );
         }
-        return uint64_t( ptr );
     }
 
 private:

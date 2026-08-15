@@ -175,9 +175,11 @@ void record_interval( ToolData* data, rocprofiler_timestamp_t start_timestamp, r
     if( src_loc != 0 )
     {
         {
-            TracySerialPrepare( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
+            TracySerialBegin;
+            TracySerialSrcLoc( src_loc );
+            TracySerialItem( tracy::QueueType::GpuZoneBeginAllocSrcLocSerial );
             tracy::MemWrite( &item->gpuZoneBegin.cpuTime, cpu_start_time );
-            tracy::MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)src_loc );
+            TracySerialFat( &item->gpuZoneBegin.srcloc, (uint64_t)src_loc );
             tracy::MemWrite( &item->gpuZoneBegin.thread, tracy::GetThreadHandle() );
             tracy::MemWrite( &item->gpuZoneBegin.queryId, query_id );
             tracy::MemWrite( &item->gpuZoneBegin.context, context_id );
