@@ -183,26 +183,13 @@ void tracyEmitMemAlloc(const char* name, const void* ptr, size_t size, TracyTime
     using namespace tracy;
     const auto thread = GetThreadHandle();
 
-    TracySerialPrepare(QueueType::MemNamePayload);
-    tracyMemWrite(item->memName.name, (uint64_t)name);
-    TracySerialCommit;
-
-    TracySerialPrepare(QueueType::MemAllocNamed);
+    TracySerialBegin;
+    TracySerialMemName( name );
+    TracySerialItem( QueueType::MemAllocNamed );
     tracyMemWrite(item->memAlloc.time, time);
     tracyMemWrite(item->memAlloc.thread, thread);
     tracyMemWrite(item->memAlloc.ptr, (uint64_t)ptr);
-
-    if (compile_time_condition<sizeof(size) == 4>::value)
-    {
-        memcpy(&item->memAlloc.size, &size, 4);
-        memset(&item->memAlloc.size + 4, 0, 2);
-    }
-    else
-    {
-        assert(sizeof(size) == 8);
-        memcpy(&item->memAlloc.size, &size, 4);
-        memcpy(((char *)&item->memAlloc.size) + 4, ((char *)&size) + 4, 2);
-    }
+    Profiler::SetMemAllocSize( item, size );
     TracySerialCommit;
 }
 
@@ -210,11 +197,9 @@ void tracyEmitMemFree(const char* name, const void* ptr, TracyTimestamp time) {
     using namespace tracy;
     const auto thread = GetThreadHandle();
 
-    TracySerialPrepare(QueueType::MemNamePayload);
-    tracyMemWrite(item->memName.name, (uint64_t)name);
-    TracySerialCommit;
-
-    TracySerialPrepare(QueueType::MemFreeNamed)
+    TracySerialBegin;
+    TracySerialMemName( name );
+    TracySerialItem( QueueType::MemFreeNamed );
     tracyMemWrite(item->memFree.time, time);
     tracyMemWrite(item->memFree.thread, thread);
     tracyMemWrite(item->memFree.ptr, (uint64_t)ptr);
